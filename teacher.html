@@ -6,9 +6,10 @@
 <meta name="google" content="notranslate" />
 <meta name="robots" content="noindex" />
 <title>ห้องครู • ห้องติว ป.5</title>
+<script src="js/theme.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Chonburi&family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/style.css" />
 <link rel="stylesheet" href="css/teacher.css" />
 </head>
@@ -18,7 +19,7 @@
   <div class="lock card">
     <div id="lockArt" class="lock-art"></div>
     <h1>ห้องครู</h1>
-    <p>กรอกรหัสลับที่ตั้งไว้ใน Google Apps Script</p>
+    <p>กรอกรหัสครูที่ตั้งไว้ในสคริปต์ Google Sheets</p>
     <form id="lockForm" novalidate>
       <div class="field">
         <label for="lockKey">รหัสครู</label>
@@ -31,26 +32,24 @@
   </div>
 </div>
 
-<div id="dashShell" class="dash-shell" hidden>
-  <div class="dash">
-    <aside class="side">
-      <a class="brand" href="teacher.html">ห้องครู<span>.</span></a>
-      <nav class="nav" id="nav" aria-label="เมนูห้องครู"></nav>
-      <div class="side-bottom">
-        <div class="upgrade card">
-          <strong>ดูหน้าที่นักเรียนเห็น</strong>
-          <a class="btn" href="./">เปิดหน้านักเรียน</a>
-        </div>
+<div id="dashShell" class="dash" hidden>
+  <aside class="side">
+    <a class="brand" href="teacher.html">ห้องครู<span>.</span></a>
+    <nav class="nav" id="nav" aria-label="เมนูห้องครู"></nav>
+    <div class="side-bottom">
+      <div class="upgrade card">
+        <strong>ดูหน้าที่นักเรียนเห็น</strong>
+        <a class="btn" href="./">เปิดหน้านักเรียน</a>
       </div>
-    </aside>
+    </div>
+  </aside>
 
-    <main class="main">
-      <div id="demoBanner" class="demo-banner card" hidden></div>
-      <div id="view"></div>
-    </main>
+  <main class="main">
+    <div id="demoBanner" class="demo-banner card" hidden></div>
+    <div id="view"></div>
+  </main>
 
-    <aside class="aside" id="aside"></aside>
-  </div>
+  <aside class="aside" id="aside"></aside>
 </div>
 
 <script src="js/config.js"></script>

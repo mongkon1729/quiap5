@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="google" content="notranslate" />
 <title>ห้องติว ป.5</title>
+<script src="js/theme.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Chonburi&family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -15,9 +16,12 @@
 
   <header class="topbar">
     <a class="brand" href="./">ห้องติว<span>.</span></a>
-    <div id="userChip" class="user-chip" hidden>
-      <span class="avatar" aria-hidden="true">★</span>
-      <span id="userChipName" class="name"></span>
+    <div class="topbar-right">
+      <div id="userChip" class="user-chip" hidden>
+        <span class="avatar" aria-hidden="true">★</span>
+        <span id="userChipName" class="name"></span>
+      </div>
+      <button id="btnTheme" type="button" class="icon-btn" aria-label="สลับโหมดสว่าง/มืด"></button>
     </div>
   </header>
 
@@ -35,6 +39,12 @@
         </div>
         <div id="heroArt" class="hero-art"></div>
       </div>
+
+      <ol id="howTo" class="how-to">
+        <li><span>1</span>เลือกชุดข้อสอบ</li>
+        <li><span>2</span>ใส่เลขที่ ชื่อเล่น และ PIN</li>
+        <li><span>3</span>ตอบทีละข้อ ดูเฉลยได้เลย</li>
+      </ol>
 
       <div class="section-head">
         <h2>ชุดข้อสอบ</h2>
@@ -101,8 +111,12 @@
     <section id="screen-quiz" class="screen" hidden>
       <div class="quiz-top">
         <div class="quiz-top-row">
+          <button id="btnQuit" type="button" class="back-link">‹ ออก</button>
           <span id="progressText" class="pill">ข้อ 1 จาก 10</span>
-          <span id="timerText" class="pill timer-pill" hidden></span>
+          <span class="quiz-top-end">
+            <span id="streakPill" class="pill pill-pink" hidden></span>
+            <span id="timerText" class="pill timer-pill" hidden></span>
+          </span>
         </div>
         <div class="bar"><span id="progressFill"></span></div>
       </div>
@@ -122,17 +136,20 @@
       </div>
 
       <div class="quiz-actions">
-        <button id="btnCheck" type="button" class="btn btn-primary" disabled>ตรวจคำตอบ</button>
+        <button id="btnCheck" type="button" class="btn btn-primary" disabled>เลือกคำตอบก่อนนะ</button>
         <button id="btnNext" type="button" class="btn btn-secondary" hidden>ข้อต่อไป</button>
+        <p class="key-hint">ใช้คีย์บอร์ดได้: กด 1-4 เพื่อเลือกข้อ แล้วกด Enter</p>
       </div>
     </section>
 
     <!-- หน้าสรุปผล -->
     <section id="screen-summary" class="screen" hidden>
       <div class="summary-card card">
+        <div id="confetti" class="confetti" aria-hidden="true"></div>
         <div id="starsRow" class="stars-row" aria-hidden="true"></div>
         <h1 id="summaryHeading">สรุปผล</h1>
         <p id="summaryScore" class="summary-score"></p>
+        <div id="summaryFacts" class="summary-facts"></div>
         <p id="summaryMessage" class="summary-message"></p>
         <div class="summary-actions">
           <button id="btnRetake" type="button" class="btn btn-primary">ทำใหม่</button>
@@ -146,7 +163,7 @@
     <section id="screen-review-done" class="screen" hidden>
       <div class="summary-card card">
         <div class="stars-row" aria-hidden="true"><span class="star on">✓</span></div>
-        <h1>ทบทวนเสร็จแล้ว</h1>
+        <h1>ทบทวนครบแล้ว</h1>
         <p id="reviewDoneText" class="summary-message"></p>
         <div class="summary-actions">
           <button id="btnReviewDoneToStart" type="button" class="btn btn-primary">กลับหน้าแรก</button>

@@ -15,11 +15,20 @@
     timerInterval: null,
     secondsLeft: 0,
     answeredCurrent: false,
+    streak: 0,
     startedAt: 0,
     currentChoiceOrder: [] // maps displayed choice position -> original choice index
   };
 
   var LETTERS = ['ก', 'ข', 'ค', 'ง'];
+  var PRAISE = ['ถูกต้อง เก่งมาก', 'ใช่เลย ตอบถูก', 'ถูกต้อง ทำได้ดีมาก', 'เยี่ยมเลย ตอบถูก'];
+  var COMFORT = ['ยังไม่ถูกนะ ลองอ่านเหตุผลดูนะ', 'ไม่เป็นไร ลองอ่านเหตุผลดูนะ', 'เกือบแล้ว ลองอ่านเหตุผลดูนะ'];
+  var SUN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+  var MOON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>';
+
+  function pick(list) {
+    return list[Math.floor(Math.random() * list.length)];
+  }
 
   var el = {};
 
@@ -27,6 +36,11 @@
     el.storageWarning = document.getElementById('storageWarning');
     el.userChip = document.getElementById('userChip');
     el.userChipName = document.getElementById('userChipName');
+    el.btnTheme = document.getElementById('btnTheme');
+    el.btnQuit = document.getElementById('btnQuit');
+    el.streakPill = document.getElementById('streakPill');
+    el.summaryFacts = document.getElementById('summaryFacts');
+    el.confetti = document.getElementById('confetti');
 
     el.screenStart = document.getElementById('screen-start');
     el.heroTitle = document.getElementById('heroTitle');
@@ -115,6 +129,7 @@
 
   function renderUserChip() {
     el.userChip.hidden = !state.currentUserName;
+    document.getElementById('howTo').hidden = !!state.currentUserName;
     el.userChipName.textContent = state.currentUserName || '';
     if (state.currentUserName) {
       el.heroTitle.textContent = 'สวัสดี ' + state.currentUserName;
@@ -250,6 +265,7 @@
     state.questions = exam.questions;
     state.currentIndex = 0;
     state.answers = [];
+    state.streak = 0;
     state.startedAt = Date.now();
     renderQuestion();
     showScreen(el.screenQuiz);
@@ -337,6 +353,8 @@
     el.feedbackBox.className = 'feedback';
     el.btnCheck.hidden = false;
     el.btnCheck.disabled = true;
+    el.btnCheck.textContent = 'เลือกคำตอบก่อนนะ';
+    renderStreak();
     el.btnNext.hidden = true;
     state.answeredCurrent = false;
   }
@@ -347,6 +365,12 @@
     buttons.forEach(function (b) { b.classList.remove('selected'); });
     btn.classList.add('selected');
     el.btnCheck.disabled = false;
+    el.btnCheck.textContent = 'ตรวจคำตอบ';
+  }
+
+  function renderStreak() {
+    el.streakPill.hidden = state.streak < 2;
+    el.streakPill.textContent = 'ถูกติดกัน ' + state.streak + ' ข้อ';
   }
 
   function checkAnswer() {
@@ -377,12 +401,15 @@
     el.explanationText.textContent = question.explanation || '';
 
     if (isCorrect) {
-      el.feedbackText.textContent = '✓ ถูกต้อง เก่งมาก!';
+      el.feedbackText.textContent = '✓ ' + pick(PRAISE);
       el.feedbackBox.classList.add('is-correct');
+      state.streak++;
     } else {
-      el.feedbackText.textContent = '✕ ยังไม่ถูกนะ ลองอ่านเหตุผลดูนะ';
+      el.feedbackText.textContent = '✕ ' + pick(COMFORT);
       el.feedbackBox.classList.add('is-wrong');
+      state.streak = 0;
     }
+    renderStreak();
 
     if (state.mode === 'normal') {
       state.answers.push({ questionId: question.id, correct: isCorrect });
@@ -403,6 +430,7 @@
     el.btnNext.hidden = false;
     var isLast = state.currentIndex >= questions.length - 1;
     el.btnNext.textContent = isLast ? (state.mode === 'review' ? 'เสร็จสิ้น' : 'ดูสรุปผล') : 'ข้อต่อไป';
+    el.btnNext.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function goNext() {
@@ -456,11 +484,11 @@
     var stars = pct >= 80 ? 3 : (pct >= 50 ? 2 : 1);
     var message;
     if (pct >= 80) {
-      message = 'เก่งมากจ้ะ! สุดยอดไปเลย';
+      message = pct === 100 ? 'ถูกครบทุกข้อ เก่งมาก' : 'เก่งมาก ตอบถูกเกือบหมดเลย';
     } else if (pct >= 50) {
-      message = 'ทำได้ดีมากนะ พยายามอีกนิดเดียว';
+      message = 'ทำได้ดีนะ ทบทวนข้อที่ผิดอีกนิด คราวหน้าได้เพิ่มแน่';
     } else {
-      message = 'ไม่เป็นไรนะ ลองทบทวนแล้วมาทำใหม่กันนะ';
+      message = 'ไม่เป็นไรนะ ลองทบทวนข้อที่ผิด แล้วกลับมาทำใหม่กัน';
     }
 
     el.summaryHeading.textContent = state.selectedExam.title;
@@ -469,6 +497,25 @@
     }).join('');
     el.summaryScore.textContent = score + ' / ' + total;
     el.summaryMessage.textContent = message;
+
+    var seconds = Math.round((Date.now() - state.startedAt) / 1000);
+    var mins = Math.floor(seconds / 60);
+    var timeText = (mins ? mins + ' นาที ' : '') + (seconds % 60) + ' วินาที';
+    var facts = ['ถูก ' + Math.round(pct) + '%', 'ใช้เวลา ' + timeText];
+    if (total < state.questions.length) facts.push('หมดเวลาก่อนครบ ' + state.questions.length + ' ข้อ');
+    el.summaryFacts.innerHTML = facts.map(function (f) { return '<span class="pill">' + escapeHtml(f) + '</span>'; }).join('');
+
+    el.confetti.innerHTML = '';
+    if (stars === 3) {
+      var colors = ['var(--yellow)', 'var(--blue)', 'var(--pink)', 'var(--mint)', 'var(--peach)'];
+      for (var i = 0; i < 26; i++) {
+        var bit = document.createElement('i');
+        bit.style.left = Math.round(Math.random() * 100) + '%';
+        bit.style.background = colors[i % colors.length];
+        bit.style.animationDelay = Math.round(Math.random() * 500) + 'ms';
+        el.confetti.appendChild(bit);
+      }
+    }
 
     var wrongCount = state.currentUserName ? Storage.getWrongQuestions(state.currentUserName).length : 0;
     el.btnReviewWrong.hidden = wrongCount === 0;
@@ -494,6 +541,7 @@
     state.questions = items;
     state.currentIndex = 0;
     state.resolvedInReview = 0;
+    state.streak = 0;
     stopTimer();
     el.timerText.hidden = true;
     renderQuestion();
@@ -503,7 +551,8 @@
   function finishReview() {
     var total = state.questions.length;
     el.reviewDoneText.textContent =
-      'ทบทวนไปทั้งหมด ' + total + ' ข้อ ทำถูกไปแล้ว ' + state.resolvedInReview + ' ข้อ ✨ ข้อที่ยังไม่ถูกจะรออยู่ให้ทบทวนใหม่ครั้งหน้านะ';
+      'ทบทวนไป ' + total + ' ข้อ ตอบถูก ' + state.resolvedInReview + ' ข้อ' +
+      (state.resolvedInReview < total ? ' ข้อที่ยังไม่ถูกจะรอให้ลองใหม่ครั้งหน้านะ' : ' ตอบถูกครบทุกข้อเลย');
     showScreen(el.screenReviewDone);
   }
 
@@ -541,6 +590,38 @@
     });
     el.btnToStart.addEventListener('click', goToStart);
     el.btnReviewDoneToStart.addEventListener('click', goToStart);
+
+    el.btnTheme.addEventListener('click', Theme.toggle);
+    Theme.onChange(renderThemeButton);
+
+    el.btnQuit.addEventListener('click', function () {
+      var msg = state.mode === 'review'
+        ? 'ออกจากการทบทวนไหม ข้อที่ยังไม่ได้ทำจะรอไว้ให้ครั้งหน้า'
+        : 'ออกจากข้อสอบชุดนี้ไหม คะแนนรอบนี้จะไม่ถูกบันทึก';
+      if (window.confirm(msg)) goToStart();
+    });
+
+    document.addEventListener('keydown', handleKeys);
+  }
+
+  function renderThemeButton() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    el.btnTheme.innerHTML = dark ? SUN_ICON : MOON_ICON;
+    el.btnTheme.setAttribute('aria-label', dark ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด');
+  }
+
+  function handleKeys(e) {
+    if (el.screenQuiz.hidden || !el.imageModal.hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+    var n = ['1', '2', '3', '4'].indexOf(e.key);
+    if (n < 0) n = LETTERS.indexOf(e.key);
+    if (n >= 0 && !state.answeredCurrent) {
+      var btn = el.choicesList.querySelectorAll('.choice-btn')[n];
+      if (btn) { selectChoice(btn); btn.focus(); }
+      e.preventDefault();
+    } else if (e.key === 'Enter') {
+      if (!el.btnCheck.hidden && !el.btnCheck.disabled) { checkAnswer(); e.preventDefault(); }
+      else if (!el.btnNext.hidden) { goNext(); e.preventDefault(); }
+    }
   }
 
   function init() {
@@ -551,6 +632,7 @@
       el.storageWarning.hidden = false;
     }
     el.heroArt.innerHTML = Art.hero();
+    renderThemeButton();
     ResultSync.flush();
 
     fetch('data/questions.json')
