@@ -109,7 +109,9 @@
   // ---------- data ----------
 
   function normalizeRows(raw) {
-    return (raw || []).map(function (r) {
+    return (raw || []).filter(function (r) {
+      return String(r.student || '').trim() && String(r.examId || '').trim();
+    }).map(function (r) {
       var t = new Date(r.timestamp).getTime();
       return {
         time: isFinite(t) ? t : 0,
@@ -711,14 +713,34 @@
     state.importMsg = null;
     render();
 
+    function fail(text) {
+      state.importing = false;
+      state.importMsg = { kind: 'bad', text: text };
+      render();
+      scrollToPreview();
+    }
+
     fetch(SHEETS_URL, {
       method: 'POST',
-      mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action: 'importExams', key: key, rows: ExamImport.toRows(exams) })
-    }).then(function () {
-      return new Promise(function (resolve) { setTimeout(resolve, 1500); });
-    }).then(function () {
+    }).then(function (res) {
+      return res.json();
+    }).then(function (reply) {
+      if (reply && reply.error === 'unauthorized') {
+        fail('รหัสครูในเครื่องนี้ไม่ตรงกับ TEACHER_KEY ในสคริปต์ ไปที่ ตั้งค่า แล้วกรอกรหัสครูใหม่ (ต้องตรงกับในสคริปต์ทุกตัวอักษร)');
+        return;
+      }
+      if (!reply || !reply.ok || reply.added === undefined) {
+        fail('ลิงก์ใน js/config.js ยังเป็นสคริปต์เวอร์ชันเก่า ตรวจว่า Push ลิงก์ใหม่แล้ว จากนั้นกด Ctrl+F5 แล้วลองอีกครั้ง');
+        return;
+      }
+      return new Promise(function (resolve) { setTimeout(resolve, 800); }).then(verifyImport);
+    }).catch(function () {
+      fail('ส่งข้อมูลไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง');
+    });
+
+    function verifyImport() {
       var calls = 0;
       ExamSource.load(function (data) {
         calls++;
@@ -738,15 +760,12 @@
           state.importMsg = { kind: 'bad', text: 'เพิ่มได้ ' + found + ' จาก ' + expected.length + ' ข้อ ลองกดเพิ่มอีกครั้ง ข้อที่มีแล้วจะถูกข้ามให้เอง' };
           state.draft = buildDraft(d.text, d.filename);
         } else {
-          state.importMsg = { kind: 'bad', text: 'ยังไม่เห็นข้อสอบใหม่ใน Google Sheets ตรวจว่าอัปเดตสคริปต์เป็นเวอร์ชัน 3 แล้ว (คลังข้อสอบ > วิธีเพิ่มข้อสอบ) และรหัสครูในเครื่องนี้ถูกต้อง' };
+          state.importMsg = { kind: 'bad', text: 'สคริปต์รับข้อมูลแล้ว แต่ยังโหลดข้อสอบใหม่ไม่ได้ ลองกด "โหลดข้อสอบใหม่" ในหน้าคลังข้อสอบอีกครั้ง' };
         }
         render();
+        scrollToPreview();
       });
-    }).catch(function () {
-      state.importing = false;
-      state.importMsg = { kind: 'bad', text: 'ส่งข้อมูลไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง' };
-      render();
-    });
+    }
   }
 
   function renderSettings() {
