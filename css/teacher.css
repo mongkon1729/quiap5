@@ -321,6 +321,10 @@ table.plain td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pick-std { margin-bottom: 10px; padding: 10px 12px; border-radius: 10px; background: var(--paper); border: 1px dashed var(--ink-soft); }
 .pick-std > p { margin: 0 0 6px; font-size: 13px; color: var(--ink-soft); }
 .pick-std > p b { color: var(--ink); }
+.core-list { margin: 0 0 8px; font-size: 13px; }
+.core-list summary { cursor: pointer; color: var(--accent); font-weight: 700; min-height: 32px; display: flex; align-items: center; }
+.core-list ul { margin: 4px 0 6px; padding-left: 20px; color: var(--ink); line-height: 1.55; }
+.core-list li.sub { list-style: circle; margin-left: 18px; color: var(--ink-soft); }
 .pick-item { display: flex; gap: 10px; align-items: flex-start; padding: 6px 4px; font-size: 14px; line-height: 1.5; cursor: pointer; border-radius: 8px; }
 .pick-item:hover { background: var(--accent-soft); }
 .pick-item input { width: 20px; height: 20px; margin-top: 2px; flex-shrink: 0; accent-color: var(--accent); }

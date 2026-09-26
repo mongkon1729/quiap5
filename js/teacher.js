@@ -100,11 +100,15 @@
       curriculum.note = data.note || '';
       curriculum.areas = [];
       curriculum.grades = data.grades || [];
+      curriculum.core = {};
       Object.keys(data.areas || {}).forEach(function (letter) {
         var area = data.areas[letter];
         curriculum.areas.push({ letter: letter, name: area.name });
         area.strands.forEach(function (strand) {
           strand.standards.forEach(function (st) {
+            Object.keys(st.core || {}).forEach(function (grade) {
+              curriculum.core[st.code + '|' + grade] = st.core[grade];
+            });
             Object.keys(st.indicators || {}).forEach(function (grade) {
               st.indicators[grade].forEach(function (entry, i) {
                 var code = st.code + ' ' + grade + '/' + (i + 1);
@@ -945,7 +949,12 @@
         var g = groups[key];
         var strandHead = g.head.strand !== lastStrand ? '<h3 class="pick-strand">' + esc(g.head.strand) + '</h3>' : '';
         lastStrand = g.head.strand;
+        var core = curriculum.core[g.head.standard + '|' + g.head.grade] || [];
         return strandHead + '<div class="pick-std"><p><b>มาตรฐาน ' + esc(g.head.standard) + '</b> ' + esc(g.head.standardText) + '</p>' +
+          (core.length ? '<details class="core-list"><summary>สาระการเรียนรู้แกนกลาง ' + esc(g.head.grade) + ' (' + core.length + ' หัวข้อ)</summary><ul>' +
+            core.map(function (c) {
+              return /^- /.test(c) ? '<li class="sub">' + esc(c.slice(2)) + '</li>' : '<li>' + esc(c) + '</li>';
+            }).join('') + '</ul></details>' : '') +
           g.items.map(function (it) {
             return '<label class="pick-item"><input type="checkbox" data-code="' + esc(it.code) + '"' + (p.codes[it.code] ? ' checked' : '') + ' />' +
               '<span><b>' + esc(it.grade + '/' + it.code.split('/')[1]) + '</b> ' + esc(it.text) +
@@ -974,7 +983,10 @@
       lesson: p.lesson,
       examType: p.examType,
       count: p.count,
-      indicators: items
+      indicators: items,
+      core: uniq(items.map(function (it) { return it.standard; })).map(function (code) {
+        return { standard: code, lines: curriculum.core[code + '|' + items[0].grade] || [] };
+      }).filter(function (c) { return c.lines.length; })
     });
   }
 

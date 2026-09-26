@@ -380,6 +380,13 @@ var ExamImport = (function () {
     add('จำนวน', meta.count ? meta.count + ' ข้อ' : '');
     lines.push('', 'ตัวชี้วัดที่ต้องวัด (ใช้รหัสตามนี้ทุกตัวอักษร และกระจายข้อสอบให้ครบทุกตัวชี้วัด):');
     (meta.indicators || []).forEach(function (it) { lines.push('- ' + it.code + ' ' + it.text); });
+    if (meta.core && meta.core.length) {
+      lines.push('', 'สาระการเรียนรู้แกนกลาง (ใช้เป็นขอบเขตเนื้อหา ห้ามออกข้อสอบเกินจากนี้):');
+      meta.core.forEach(function (c) {
+        lines.push('มาตรฐาน ' + c.standard);
+        c.lines.forEach(function (l) { lines.push(/^- /.test(l) ? '    ' + l : '• ' + l); });
+      });
+    }
     lines.push('', 'ให้บรรทัดหัวของชุด (ชุด ระดับชั้น กลุ่มสาระ รายวิชา รหัสวิชา สาระ มาตรฐาน หน่วยการเรียนรู้ เรื่อง ประเภทการสอบ) ตรงกับข้อมูลด้านบน', '');
     return lines.join('\n') + '\n' + CONDITIONS + EXAMPLE;
   }
