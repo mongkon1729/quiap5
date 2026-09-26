@@ -40,7 +40,7 @@
     sheet: null,
     draft: null,
     importMsg: null,
-    pick: { codes: {}, title: '', subject: '', courseCode: '', unit: '', lesson: '', examType: '', count: '10' },
+    pick: { area: 'ส', grade: 'ป.5', touched: false, codes: {}, title: '', subject: '', courseCode: '', unit: '', lesson: '', examType: '', count: '10' },
     importing: false,
     studentQuery: '',
     scriptText: null,
@@ -82,7 +82,7 @@
 
   // ---------- curriculum (data/curriculum.json) ----------
 
-  var curriculum = { list: [], byCode: {}, source: '', note: '' };
+  var curriculum = { list: [], byCode: {}, source: '', note: '', areas: [], grades: [] };
 
   function arabicDigits(s) {
     return String(s || '').replace(/[๐-๙]/g, function (d) { return String(d.charCodeAt(0) - 0x0E50); });
@@ -90,7 +90,7 @@
 
   // "ส3.1 ป.5/2" / "ส ๓.๑ ป.๕/๒" -> "ส 3.1 ป.5/2"
   function normCode(code) {
-    var m = arabicDigits(code).match(/([ทควสพศงอ])\s*(\d+)\.(\d+)\s*(ป|ม)\.\s*(\d)\s*\/\s*(\d+)/);
+    var m = arabicDigits(code).match(/([ทควสพศงต])\s*(\d+)\.(\d+)\s*(ป|ม)\.\s*(\d)\s*\/\s*(\d+)/);
     return m ? m[1] + ' ' + m[2] + '.' + m[3] + ' ' + m[4] + '.' + m[5] + '/' + m[6] : '';
   }
 
@@ -98,16 +98,21 @@
     return fetch('data/curriculum.json').then(function (r) { return r.json(); }).then(function (data) {
       curriculum.source = data.source || '';
       curriculum.note = data.note || '';
+      curriculum.areas = [];
+      curriculum.grades = data.grades || [];
       Object.keys(data.areas || {}).forEach(function (letter) {
         var area = data.areas[letter];
+        curriculum.areas.push({ letter: letter, name: area.name });
         area.strands.forEach(function (strand) {
           strand.standards.forEach(function (st) {
             Object.keys(st.indicators || {}).forEach(function (grade) {
-              st.indicators[grade].forEach(function (text, i) {
+              st.indicators[grade].forEach(function (entry, i) {
                 var code = st.code + ' ' + grade + '/' + (i + 1);
                 var item = {
-                  code: code, text: text, grade: grade, standard: st.code, standardText: st.text,
-                  strand: 'สาระที่ ' + strand.no + ' ' + strand.name, area: area.name, letter: letter, strandNo: strand.no
+                  code: code, text: typeof entry === 'string' ? entry : entry.text, alt: entry.alt || '',
+                  grade: grade, standard: st.code, standardText: st.text,
+                  strand: 'สาระที่ ' + strand.no + ' ' + strand.name, area: area.name, letter: letter, strandNo: strand.no,
+                  revised: strand.revised || area.revised || null
                 };
                 curriculum.byCode[code] = item;
                 curriculum.list.push(item);
@@ -908,16 +913,26 @@
       return '<label class="pick-field"><span>' + label + '</span><input data-pick="' + key + '" type="' + (type || 'text') + '" value="' + esc(p[key]) + '" placeholder="' + esc(placeholder || '') + '" /></label>';
     }
     var types = ExamSource.EXAM_TYPES.map(function (t) { return '<option' + (p.examType === t ? ' selected' : '') + '>' + t + '</option>'; }).join('');
+    var areaOpts = curriculum.areas.map(function (a) {
+      return '<option value="' + a.letter + '"' + (p.area === a.letter ? ' selected' : '') + '>' + esc(a.name) + '</option>';
+    }).join('');
+    var gradeOpts = curriculum.grades.map(function (g) {
+      return '<option' + (p.grade === g ? ' selected' : '') + '>' + g + '</option>';
+    }).join('');
+    var list = curriculum.list.filter(function (it) { return it.letter === p.area && it.grade === p.grade; });
+    var areaName = (curriculum.areas.find(function (a) { return a.letter === p.area; }) || {}).name || '';
     var groups = {};
     var order = [];
-    curriculum.list.forEach(function (it) {
+    list.forEach(function (it) {
       var key = it.grade + '|' + it.standard;
       if (!groups[key]) { groups[key] = { head: it, items: [] }; order.push(key); }
       groups[key].items.push(it);
     });
     var lastStrand = '';
-    return '<details class="picker"' + (pickedCodes().length ? ' open' : '') + '><summary>เลือกตัวชี้วัดจากหลักสูตร (' + esc(curriculum.list[0].area) + ' ' + esc(curriculum.list[0].grade) + ')</summary>' +
+    return '<details class="picker"' + (pickedCodes().length || p.touched ? ' open' : '') + '><summary>เลือกตัวชี้วัดจากหลักสูตร (' + esc(areaName) + ' ' + esc(p.grade) + ')</summary>' +
       '<div class="pick-fields">' +
+        '<label class="pick-field"><span>กลุ่มสาระการเรียนรู้</span><select data-pick="area" data-rerender="1">' + areaOpts + '</select></label>' +
+        '<label class="pick-field"><span>ระดับชั้น</span><select data-pick="grade" data-rerender="1">' + gradeOpts + '</select></label>' +
         field('title', 'ชื่อชุด', 'เช่น เศรษฐกิจน่ารู้ หลังเรียน') +
         field('subject', 'รายวิชา', 'เช่น สังคมศึกษา 5') +
         field('courseCode', 'รหัสวิชา', 'เช่น ส15101') +
@@ -933,9 +948,10 @@
         return strandHead + '<div class="pick-std"><p><b>มาตรฐาน ' + esc(g.head.standard) + '</b> ' + esc(g.head.standardText) + '</p>' +
           g.items.map(function (it) {
             return '<label class="pick-item"><input type="checkbox" data-code="' + esc(it.code) + '"' + (p.codes[it.code] ? ' checked' : '') + ' />' +
-              '<span><b>' + esc(it.grade + '/' + it.code.split('/')[1]) + '</b> ' + esc(it.text) + '</span></label>';
+              '<span><b>' + esc(it.grade + '/' + it.code.split('/')[1]) + '</b> ' + esc(it.text) +
+              (it.alt ? '<br><span class="muted" style="font-size:12px">อีกฉบับเขียนว่า: ' + esc(it.alt) + '</span>' : '') + '</span></label>';
           }).join('') + '</div>';
-      }).join('') + '</div>' +
+      }).join('') + (list.length ? '' : '<p class="empty-note">ชั้นนี้ไม่มีตัวชี้วัดในกลุ่มสาระนี้</p>') + '</div>' +
       '<p class="note">ที่มา: ' + esc(curriculum.source) + (curriculum.note ? ' • ' + esc(curriculum.note) : '') + '</p></details>';
   }
 
@@ -1391,7 +1407,16 @@
     document.addEventListener('submit', onSubmit);
     document.addEventListener('change', function (e) {
       if (e.target.id === 'importFile') readImportFile(e.target.files[0]);
-      if (e.target.dataset.pick) state.pick[e.target.dataset.pick] = e.target.value;
+      if (e.target.dataset.pick) {
+        state.pick[e.target.dataset.pick] = e.target.value;
+        if (e.target.dataset.rerender) {
+          state.pick.codes = {};
+          state.pick.touched = true;
+          var y = window.scrollY;
+          render();
+          window.scrollTo(0, y);
+        }
+      }
       if (e.target.dataset.code) {
         state.pick.codes[e.target.dataset.code] = e.target.checked;
         var btn = $('promptBtn');

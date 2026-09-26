@@ -145,7 +145,7 @@ var ExamSource = (function () {
 
   var LEARNING_AREAS = {
     'ท': 'ภาษาไทย', 'ค': 'คณิตศาสตร์', 'ว': 'วิทยาศาสตร์และเทคโนโลยี', 'ส': 'สังคมศึกษา ศาสนา และวัฒนธรรม',
-    'พ': 'สุขศึกษาและพลศึกษา', 'ศ': 'ศิลปะ', 'ง': 'การงานอาชีพ', 'อ': 'ภาษาต่างประเทศ'
+    'พ': 'สุขศึกษาและพลศึกษา', 'ศ': 'ศิลปะ', 'ง': 'การงานอาชีพ', 'ต': 'ภาษาต่างประเทศ'
   };
   var SOCIAL_STRANDS = {
     '1': 'สาระที่ 1 ศาสนา ศีลธรรม และจริยธรรม',
@@ -168,7 +168,8 @@ var ExamSource = (function () {
 
   // "ส 3.1 ป.5/1" -> { area: 'ส', standard: 'ส 3.1', grade: 'ป.5' }
   function splitIndicator(text) {
-    var m = String(text || '').match(/([ทควสพศงอ])\s*(\d+)\.(\d+)\s*((?:ป|ม)\.\s*\d)/);
+    var m = String(text || '').replace(/[๐-๙]/g, function (d) { return String(d.charCodeAt(0) - 0x0E50); })
+      .match(/([ทควสพศงต])\s*(\d+)\.(\d+)\s*((?:ป|ม)\.\s*\d)/);
     if (!m) return null;
     return { area: m[1], strandNo: m[2], standard: m[1] + ' ' + m[2] + '.' + m[3], grade: m[4].replace(/\s+/g, '') };
   }
