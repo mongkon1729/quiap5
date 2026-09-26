@@ -35,6 +35,7 @@
     studentKey: null,
     analysisExamId: null,
     bankExamId: null,
+    sheet: null,
     studentQuery: '',
     scriptText: null,
     stats: null
@@ -453,21 +454,92 @@
       var exam = examById(state.bankExamId);
       if (exam) return bankDetail(exam);
     }
-    var html = head('คลังข้อสอบ', state.exams.length + ' ชุด • ' + state.exams.reduce(function (n, e) { return n + e.questions.length; }, 0) + ' ข้อ');
+    var html = head('คลังข้อสอบ', state.exams.length + ' ชุด • ' + state.exams.reduce(function (n, e) { return n + e.questions.length; }, 0) + ' ข้อ',
+      SHEETS_URL ? '<button type="button" class="btn btn-sm" data-action="reload-exams">โหลดข้อสอบใหม่</button>' : '');
+    html += sheetPanel();
     html += '<div class="bank-grid">' + state.exams.map(function (e, i) {
       var bloom = {};
       e.questions.forEach(function (q) { if (q.bloom) bloom[q.bloom] = (bloom[q.bloom] || 0) + 1; });
       return '<article class="bank-card card" style="animation-delay:' + (i * 60) + 'ms"><div class="cover">' + Art.cover(i) + '</div><div class="body">' +
         '<h3>' + esc(e.title) + '</h3>' +
-        '<div class="exam-meta"><span>' + e.questions.length + ' ข้อ</span><span>จับเวลา ' + (e.timeLimitMinutes || 15) + ' นาที</span></div>' +
+        '<div class="exam-meta"><span>' + e.questions.length + ' ข้อ</span><span>จับเวลา ' + (e.timeLimitMinutes || 15) + ' นาที</span>' +
+        '<span>' + (e.source === 'sheets' ? 'จาก Google Sheets' : 'จากไฟล์ในเว็บ') + '</span></div>' +
         '<div class="chips" style="margin:0;gap:6px">' + Object.keys(bloom).map(function (b) {
           return '<span class="pill">' + esc(b) + ' ' + bloom[b] + '</span>';
         }).join('') + '</div>' +
         '<button type="button" class="btn btn-primary" data-action="open-bank" data-exam="' + esc(e.id) + '">ดูข้อสอบและเฉลย</button>' +
         '</div></article>';
     }).join('') + '</div>';
-    html += '<p class="note">อยากเพิ่มหรือแก้ข้อสอบ ให้แก้ไฟล์ data/questions.json (หรือส่งไฟล์ Word มาให้ Claude ช่วยแปลง)</p>';
+    html += sheetGuide();
     return html;
+  }
+
+  var EXAM_HEADERS = ['ชุดข้อสอบ', 'วิชา', 'เวลา(นาที)', 'หัวข้อ', 'ตัวชี้วัด', 'Bloom', 'คำถาม', 'ก', 'ข', 'ค', 'ง', 'คำตอบ', 'คำอธิบาย', 'รูปภาพ'];
+
+  function sheetPanel() {
+    if (!SHEETS_URL) {
+      return '<div class="panel card block"><div class="block-head"><h2>เพิ่มข้อสอบเอง</h2></div>' +
+        '<p class="note" style="margin-top:0">เชื่อม Google Sheets ในเมนูตั้งค่าก่อน แล้วครูจะเพิ่มข้อสอบใหม่ได้เองจากแท็บ "ข้อสอบ" ในสเปรดชีต</p>' +
+        '<div style="margin-top:12px"><button type="button" class="btn btn-sm" data-action="nav" data-view="settings">ไปที่ตั้งค่า</button></div></div>';
+    }
+    var sh = state.sheet || { sheetStatus: 'loading', sheetExams: [], issues: [] };
+    var nQ = sh.sheetExams.reduce(function (n, e) { return n + e.questions.length; }, 0);
+    var status = {
+      loading: '<span class="pill pill-yellow">กำลังโหลดจาก Google Sheets</span>',
+      fresh: '<span class="pill pill-mint">ล่าสุดแล้ว</span>',
+      cached: '<span class="pill pill-yellow">โหลดใหม่ไม่ได้ กำลังใช้ข้อมูลที่จำไว้</span>',
+      error: '<span class="pill pill-peach">อ่านแท็บข้อสอบไม่ได้</span>'
+    }[sh.sheetStatus] || '';
+
+    var html = '<div class="panel card block"><div class="block-head"><h2>ข้อสอบจาก Google Sheets</h2></div>' +
+      '<div class="status-line">' + status + '<span>' + sh.sheetExams.length + ' ชุด • ' + nQ + ' ข้อ</span></div>';
+
+    if (sh.sheetStatus === 'error') {
+      html += '<p class="note" style="margin-top:0">ถ้ายังไม่ได้อัปเดตสคริปต์เป็นเวอร์ชัน 2 ให้ทำตามขั้นตอนที่ 1 ด้านล่างก่อน</p>';
+    }
+    if (sh.issues.length) {
+      html += '<div class="error-text" style="margin-top:4px"><b>มี ' + sh.issues.length + ' แถวที่ยังไม่ขึ้นเว็บ</b> แก้ในสเปรดชีตแล้วกด "โหลดข้อสอบใหม่"' +
+        '<ul style="margin:6px 0 0;padding-left:20px">' + sh.issues.slice(0, 12).map(function (it) {
+          return '<li>แถว ' + it.row + ': ' + esc(it.message) + '</li>';
+        }).join('') + (sh.issues.length > 12 ? '<li>และอีก ' + (sh.issues.length - 12) + ' แถว</li>' : '') + '</ul></div>';
+    } else if (sh.sheetStatus === 'fresh' && sh.sheetExams.length) {
+      html += '<p class="msg ok" style="margin-top:0">ทุกแถวถูกต้อง นักเรียนจะเห็นข้อสอบใหม่เมื่อเปิดเว็บครั้งถัดไป</p>';
+    }
+    return html + '</div>';
+  }
+
+  function sheetGuide() {
+    if (!SHEETS_URL) return '';
+    return '<details class="panel card block guide"' + (state.sheet && state.sheet.sheetExams.length ? '' : ' open') + '>' +
+      '<summary><h2>วิธีเพิ่มข้อสอบผ่าน Google Sheets</h2></summary>' +
+      '<ol class="steps" style="margin-top:14px">' +
+      '<li><b>อัปเดตสคริปต์เป็นเวอร์ชัน 2 (ทำครั้งเดียว)</b><br>เปิดสเปรดชีต → ส่วนขยาย → Apps Script → <b>จดรหัสในบรรทัด TEACHER_KEY ไว้ก่อน</b> → ลบโค้ดเดิมทั้งหมด → วางโค้ดใหม่ → ใส่รหัสเดิมกลับใน TEACHER_KEY → กดบันทึก<br>' +
+        'จากนั้นกด ทำให้ใช้งานได้ → <b>จัดการการทำให้ใช้งานได้</b> → กดรูปดินสอ → ช่องเวอร์ชันเลือก <b>เวอร์ชันใหม่</b> → กดทำให้ใช้งานได้ (ลิงก์เดิมใช้ต่อได้ ไม่ต้องแก้ config.js)' +
+        '<div style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" data-action="copy-script">คัดลอกสคริปต์เวอร์ชัน 2</button> <span id="copyMsg" class="msg ok" hidden>คัดลอกแล้ว</span></div>' +
+        '<pre class="code-box" id="scriptBox" hidden></pre></li>' +
+      '<li>กดปุ่ม <b>โหลดข้อสอบใหม่</b> ด้านบนหนึ่งครั้ง สเปรดชีตจะมีแท็บใหม่ชื่อ <b>ข้อสอบ</b> พร้อมหัวตาราง</li>' +
+      '<li>กรอกข้อสอบในแท็บ <b>ข้อสอบ</b> <b>1 แถว = 1 ข้อ</b><table class="plain" style="margin-top:8px"><tbody>' +
+        '<tr><td><b>ชุดข้อสอบ</b></td><td>ชื่อชุด พิมพ์ให้เหมือนกันทุกแถวในชุดเดียวกัน (หรือพิมพ์แค่แถวแรก แถวถัดไปเว้นว่างได้)</td></tr>' +
+        '<tr><td><b>วิชา / เวลา(นาที)</b></td><td>ใส่แถวแรกของชุดก็พอ ถ้าไม่ใส่เวลา ระบบให้ 1.5 นาทีต่อข้อ</td></tr>' +
+        '<tr><td><b>หัวข้อ / ตัวชี้วัด / Bloom</b></td><td>ไม่บังคับ ใส่แล้วหน้าวิเคราะห์ข้อสอบจะแยกผลให้</td></tr>' +
+        '<tr><td><b>คำถาม, ก, ข, ค, ง</b></td><td>จำเป็นต้องใส่ทั้งหมด</td></tr>' +
+        '<tr><td><b>คำตอบ</b></td><td>พิมพ์ ก ข ค หรือ ง</td></tr>' +
+        '<tr><td><b>คำอธิบาย</b></td><td>เหตุผลที่นักเรียนจะเห็นหลังตอบ</td></tr>' +
+        '<tr><td><b>รูปภาพ</b></td><td>ไม่บังคับ ใส่ลิงก์รูปที่เปิดดูได้โดยตรง</td></tr>' +
+        '</tbody></table></li>' +
+      '<li><b>มีข้อสอบใน Excel อยู่แล้ว:</b> เรียงคอลัมน์ใน Excel ให้ตรงกับหัวตาราง แล้วคัดลอกทั้งหมดไปวางในแท็บข้อสอบ ตั้งแต่แถวที่ 2' +
+        '<div style="margin-top:10px"><button type="button" class="btn btn-sm" data-action="copy-header">คัดลอกหัวตารางไปวางใน Excel</button> <span id="headerMsg" class="msg ok" hidden>คัดลอกแล้ว</span></div></li>' +
+      '<li>กลับมาหน้านี้ กด <b>โหลดข้อสอบใหม่</b> ถ้ามีแถวที่กรอกผิด ระบบจะบอกเลขแถวให้แก้</li>' +
+      '</ol><p class="note">ถ้าแก้ข้อความในช่องคำถาม ระบบจะนับข้อนั้นเป็นข้อใหม่ ประวัติ "ข้อที่เคยตอบผิด" ของข้อนั้นจะเริ่มนับใหม่ ส่วนการแก้ตัวเลือก คำตอบ หรือคำอธิบาย ไม่กระทบประวัติ</p></details>';
+  }
+
+  function copyText(text, msgId) {
+    var done = function () { var m = $(msgId); if (m) m.hidden = false; };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { window.prompt('คัดลอกข้อความนี้', text); });
+    } else {
+      window.prompt('คัดลอกข้อความนี้', text);
+    }
   }
 
   function bankDetail(exam) {
@@ -579,7 +651,7 @@
     var view = $('view');
     view.innerHTML = '<div class="view">' + views[state.view]() + '</div>';
     $('aside').innerHTML = renderAside();
-    if (state.view === 'settings') loadScript();
+    if ($('scriptBox')) loadScript();
   }
 
   function go(view) {
@@ -612,8 +684,10 @@
   }
 
   function selectScript() {
+    var box = $('scriptBox');
+    box.hidden = false;
     var range = document.createRange();
-    range.selectNodeContents($('scriptBox'));
+    range.selectNodeContents(box);
     var sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
@@ -637,6 +711,8 @@
     else if (a === 'theme') { Theme.set(t.dataset.theme); render(); }
     else if (a === 'print') window.print();
     else if (a === 'copy-script') copyScript();
+    else if (a === 'copy-header') copyText(EXAM_HEADERS.join('\t'), 'headerMsg');
+    else if (a === 'reload-exams') reloadExams();
     else if (a === 'forget-key') { lsSet(KEY_STORE, null); state.connected = false; showLock(); }
   }
 
@@ -719,15 +795,36 @@
     document.addEventListener('submit', onSubmit);
     bindLock();
 
-    fetch('data/questions.json').then(function (r) { return r.json(); }).then(function (data) {
-      state.exams = data.exams || [];
+    var started = false;
+    ExamSource.load(function (data) {
+      state.exams = data.exams;
+      state.sheet = data;
       analyze();
+      if (started) {
+        if (!$('dashShell').hidden) render();
+        return;
+      }
+      started = true;
       if (!SHEETS_URL) { showDash(); return; }
       var key = lsGet(KEY_STORE);
       if (!key) { showLock(); return; }
       tryKey(key).then(showDash).catch(showLock);
-    }).catch(function () {
+    }, function () {
       document.body.innerHTML = '<p class="empty-note">โหลดข้อมูลข้อสอบไม่ได้ ลองรีเฟรชหน้านี้อีกครั้ง</p>';
+    });
+  }
+
+  function reloadExams() {
+    var btn = document.querySelector('[data-action="reload-exams"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'กำลังโหลด...'; }
+    var calls = 0;
+    ExamSource.load(function (data) {
+      calls++;
+      if (ExamSource.isEnabled() && calls === 1) return;
+      state.exams = data.exams;
+      state.sheet = data;
+      analyze();
+      render();
     });
   }
 

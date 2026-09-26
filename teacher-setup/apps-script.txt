@@ -1,10 +1,31 @@
-// ===== ห้องติว ป.5 : สคริปต์รับคะแนน =====
+// ===== ห้องติว ป.5 : สคริปต์รับคะแนนและข้อสอบ (เวอร์ชัน 2) =====
 // 1) เปลี่ยนรหัสด้านล่างเป็นรหัสลับของครูเอง (ใช้เปิดหน้าครู) ห้ามบอกนักเรียน
 var TEACHER_KEY = 'เปลี่ยนเป็นรหัสลับของครู';
 
 var SHEET_NAME = 'results';
 var HEADERS = ['timestamp', 'student', 'examId', 'examTitle', 'score', 'answered',
   'questionCount', 'completed', 'wrongIds', 'durationSec', 'clientId'];
+
+var EXAM_SHEET_NAME = 'ข้อสอบ';
+var EXAM_HEADERS = ['ชุดข้อสอบ', 'วิชา', 'เวลา(นาที)', 'หัวข้อ', 'ตัวชี้วัด', 'Bloom', 'คำถาม',
+  'ก', 'ข', 'ค', 'ง', 'คำตอบ', 'คำอธิบาย', 'รูปภาพ'];
+
+function getExamSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(EXAM_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(EXAM_SHEET_NAME);
+    sheet.getRange(1, 1, 1, EXAM_HEADERS.length).setValues([EXAM_HEADERS]).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function readExams_() {
+  var sheet = getExamSheet_();
+  if (sheet.getLastRow() === 0) return [];
+  return sheet.getRange(1, 1, sheet.getLastRow(), Math.max(sheet.getLastColumn(), 1)).getDisplayValues();
+}
 
 function getSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -64,6 +85,9 @@ function doPost(e) {
 }
 
 function doGet(e) {
+  if (e.parameter.action === 'exams') {
+    return json_({ ok: true, values: readExams_() });
+  }
   if (!e.parameter.key || e.parameter.key !== TEACHER_KEY) {
     return json_({ ok: false, error: 'unauthorized' });
   }

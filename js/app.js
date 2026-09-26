@@ -635,15 +635,12 @@
     renderThemeButton();
     ResultSync.flush();
 
-    fetch('data/questions.json')
-      .then(function (res) { return res.json(); })
-      .then(function (data) {
-        examsData = data;
-        renderStartScreen();
-      })
-      .catch(function () {
-        el.examList.innerHTML = '<p class="empty-note">โหลดข้อสอบไม่ได้ ลองเช็กอินเทอร์เน็ตแล้วรีเฟรชหน้านี้อีกครั้งนะ</p>';
-      });
+    ExamSource.load(function (data) {
+      examsData = { exams: data.exams };
+      if (!el.screenStart.hidden) renderStartScreen();
+    }, function () {
+      el.examList.innerHTML = '<p class="empty-note">โหลดข้อสอบไม่ได้ ลองเช็กอินเทอร์เน็ตแล้วรีเฟรชหน้านี้อีกครั้งนะ</p>';
+    });
   }
 
   document.addEventListener('DOMContentLoaded', init);

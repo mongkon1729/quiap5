@@ -215,7 +215,7 @@ table.plain td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .item .tags .pill { font-size: 12px; white-space: normal; }
 
 /* exam bank */
-.bank-grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+.bank-grid { display: grid; grid-template-columns: 1fr; gap: 18px; margin-bottom: 26px; }
 @media (min-width: 700px) { .bank-grid { grid-template-columns: 1fr 1fr; } }
 .bank-card { overflow: hidden; display: flex; flex-direction: column; animation: rise .4s var(--ease) both; }
 .bank-card .cover { height: 100px; }
@@ -279,6 +279,31 @@ table.plain td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
   line-height: 1.5;
   white-space: pre;
 }
+.guide summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+  min-height: 44px;
+}
+.guide summary::-webkit-details-marker { display: none; }
+.guide summary::before {
+  content: '+';
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: var(--border);
+  border-radius: 50%;
+  background: var(--yellow);
+  color: #23212c;
+  font-weight: 800;
+}
+.guide[open] summary::before { content: '−'; }
+.guide summary h2 { margin: 0; font-size: 18px; }
+.steps table.plain td { font-size: 14px; }
 .status-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 .inline-form { display: flex; gap: 10px; flex-wrap: wrap; }
 .inline-form input {
