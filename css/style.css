@@ -313,6 +313,9 @@ button { font-family: inherit; }
 .exam-card .cover .pill { position: absolute; top: 10px; left: 10px; }
 .exam-card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .exam-card h3 { margin: 0; font-size: 19px; }
+.exam-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.exam-tags .pill { font-size: 13px; }
+.exam-lesson { margin: -4px 0 0; font-size: 15px; color: var(--ink-soft); }
 .exam-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--ink-soft); font-size: 15px; }
 .best-row { display: flex; justify-content: space-between; font-size: 14px; color: var(--ink-soft); }
 .best-row strong { color: var(--ink); }

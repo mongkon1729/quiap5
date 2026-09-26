@@ -6,7 +6,17 @@ var ExamSource = (function () {
 
   var COLUMNS = {
     exam: ['ชุดข้อสอบ', 'ชื่อชุด', 'exam', 'exam_title', 'title'],
-    subject: ['วิชา', 'subject'],
+    subject: ['วิชา', 'รายวิชา', 'subject'],
+    grade: ['ระดับชั้น', 'ชั้น', 'grade'],
+    learningArea: ['กลุ่มสาระ', 'กลุ่มสาระการเรียนรู้', 'learning_area'],
+    courseCode: ['รหัสวิชา', 'course_code'],
+    strand: ['สาระ', 'strand'],
+    standard: ['มาตรฐาน', 'standard'],
+    unit: ['หน่วยการเรียนรู้', 'หน่วย', 'unit'],
+    lesson: ['เรื่อง', 'lesson'],
+    examType: ['ประเภทการสอบ', 'ประเภท', 'exam_type'],
+    examDifficulty: ['ความยากของชุด', 'exam_difficulty'],
+    difficulty: ['ความยาก', 'difficulty'],
     minutes: ['เวลา(นาที)', 'เวลา', 'นาที', 'minutes', 'time_limit'],
     topic: ['หัวข้อ', 'topic'],
     indicator: ['ตัวชี้วัด', 'indicator'],
@@ -92,14 +102,18 @@ var ExamSource = (function () {
         exam = byTitle[title] = {
           id: 'sheet-' + hash(title),
           title: title,
-          subject: cell(row, 'subject') || 'สังคมศึกษา',
-          timeLimitMinutes: parseInt(cell(row, 'minutes'), 10) || 0,
+          subject: '',
+          timeLimitMinutes: 0,
           source: 'sheets',
           questions: []
         };
         order.push(exam);
       }
       if (!exam.timeLimitMinutes) exam.timeLimitMinutes = parseInt(cell(row, 'minutes'), 10) || 0;
+      SET_FIELDS.forEach(function (f) {
+        var key = f === 'examDifficulty' ? 'difficulty' : f;
+        if (!exam[key]) exam[key] = cell(row, f);
+      });
 
       var qid = 'h' + hash(question);
       if (exam.questions.some(function (q) { return q.id === qid; })) {
@@ -116,6 +130,7 @@ var ExamSource = (function () {
         explanation: cell(row, 'explanation'),
         indicator: cell(row, 'indicator'),
         bloom: cell(row, 'bloom'),
+        difficulty: normalizeDifficulty(cell(row, 'difficulty')),
         sheetRow: rowNo
       });
     }
@@ -124,6 +139,81 @@ var ExamSource = (function () {
       if (!e.timeLimitMinutes) e.timeLimitMinutes = Math.max(5, Math.round(e.questions.length * 1.5));
     });
     return { exams: order, issues: issues };
+  }
+
+  var SET_FIELDS = ['subject', 'grade', 'learningArea', 'courseCode', 'strand', 'standard', 'unit', 'lesson', 'examType', 'examDifficulty'];
+
+  var LEARNING_AREAS = {
+    'ท': 'ภาษาไทย', 'ค': 'คณิตศาสตร์', 'ว': 'วิทยาศาสตร์และเทคโนโลยี', 'ส': 'สังคมศึกษา ศาสนา และวัฒนธรรม',
+    'พ': 'สุขศึกษาและพลศึกษา', 'ศ': 'ศิลปะ', 'ง': 'การงานอาชีพ', 'อ': 'ภาษาต่างประเทศ'
+  };
+  var SOCIAL_STRANDS = {
+    '1': 'สาระที่ 1 ศาสนา ศีลธรรม และจริยธรรม',
+    '2': 'สาระที่ 2 หน้าที่พลเมือง วัฒนธรรม และการดำเนินชีวิตในสังคม',
+    '3': 'สาระที่ 3 เศรษฐศาสตร์',
+    '4': 'สาระที่ 4 ประวัติศาสตร์',
+    '5': 'สาระที่ 5 ภูมิศาสตร์'
+  };
+  var DIFFICULTIES = ['ง่าย', 'ปานกลาง', 'ยาก'];
+  var EXAM_TYPES = ['ก่อนเรียน', 'ระหว่างเรียน', 'หลังเรียน', 'กลางภาค', 'ปลายภาค', 'ฝึกทำ'];
+
+  function normalizeDifficulty(v) {
+    var s = String(v || '').trim();
+    if (!s) return '';
+    if (/ง่าย|easy/i.test(s)) return 'ง่าย';
+    if (/ยาก|hard/i.test(s) && !/ปาน/.test(s)) return 'ยาก';
+    if (/ปาน|กลาง|medium/i.test(s)) return 'ปานกลาง';
+    return s;
+  }
+
+  // "ส 3.1 ป.5/1" -> { area: 'ส', standard: 'ส 3.1', grade: 'ป.5' }
+  function splitIndicator(text) {
+    var m = String(text || '').match(/([ทควสพศงอ])\s*(\d+)\.(\d+)\s*((?:ป|ม)\.\s*\d)/);
+    if (!m) return null;
+    return { area: m[1], strandNo: m[2], standard: m[1] + ' ' + m[2] + '.' + m[3], grade: m[4].replace(/\s+/g, '') };
+  }
+
+  // Fills set-level curriculum info from the questions' indicators when the teacher left it blank.
+  function enrich(exam) {
+    var standards = [];
+    var indicators = [];
+    var parts = null;
+    exam.questions.forEach(function (q) {
+      if (q.difficulty) q.difficulty = normalizeDifficulty(q.difficulty);
+      String(q.indicator || '').split(/[,،]/).forEach(function (raw) {
+        var ind = raw.trim();
+        if (!ind) return;
+        if (indicators.indexOf(ind) < 0) indicators.push(ind);
+        var p = splitIndicator(ind);
+        if (p) {
+          parts = parts || p;
+          if (standards.indexOf(p.standard) < 0) standards.push(p.standard);
+        }
+      });
+    });
+    exam.indicators = indicators;
+    if (!exam.standard && standards.length) exam.standard = standards.join(', ');
+    if (parts) {
+      if (!exam.grade) exam.grade = parts.grade;
+      if (!exam.learningArea) exam.learningArea = LEARNING_AREAS[parts.area] || '';
+      if (!exam.strand && parts.area === 'ส') {
+        var nums = [];
+        standards.forEach(function (s) { var n = s.split(' ')[1].split('.')[0]; if (nums.indexOf(n) < 0) nums.push(n); });
+        exam.strand = nums.map(function (n) { return SOCIAL_STRANDS[n]; }).filter(Boolean).join(', ');
+      }
+    }
+    exam.difficulty = normalizeDifficulty(exam.difficulty);
+    if (!exam.difficulty) {
+      var count = { 'ง่าย': 0, 'ปานกลาง': 0, 'ยาก': 0 };
+      var rated = 0;
+      exam.questions.forEach(function (q) { if (count[q.difficulty] != null) { count[q.difficulty]++; rated++; } });
+      if (rated) {
+        exam.difficulty = DIFFICULTIES.reduce(function (best, d) { return count[d] > count[best] ? d : best; }, 'ปานกลาง');
+        exam.difficultyDerived = true;
+      }
+    }
+    if (!exam.subject) exam.subject = exam.learningArea ? exam.learningArea.split(' ')[0] : '';
+    return exam;
   }
 
   function readCache() {
@@ -150,6 +240,7 @@ var ExamSource = (function () {
       .then(function (data) {
         clearTimeout(timer);
         if (!data || !data.ok || !Array.isArray(data.values)) throw new Error('bad response');
+        lastVersion = data.version || 3;
         return data.values;
       }, function (err) {
         clearTimeout(timer);
@@ -159,14 +250,19 @@ var ExamSource = (function () {
 
   function combine(fileExams, values, status, savedAt) {
     var parsed = values ? parseSheet(values) : { exams: [], issues: [] };
+    fileExams.forEach(enrich);
+    parsed.exams.forEach(enrich);
     return {
       exams: fileExams.concat(parsed.exams),
       sheetExams: parsed.exams,
       issues: parsed.issues,
       sheetStatus: status,
-      sheetSavedAt: savedAt || null
+      sheetSavedAt: savedAt || null,
+      scriptVersion: status === 'fresh' ? lastVersion : null
     };
   }
+
+  var lastVersion = null;
 
   // Calls onData once with file exams + cached sheet exams, then again when fresh sheet data arrives.
   function load(onData, onError) {
@@ -176,8 +272,7 @@ var ExamSource = (function () {
     fetch('data/questions.json')
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        fileExams = (data.exams || []).map(function (e) { e.source = 'file'; return e; });
-        if (!sheetsUrl()) { onData(combine(fileExams, null, 'off')); return; }
+        fileExams = (data.exams || []).map(function (e) { e.source = 'file'; return e; });        if (!sheetsUrl()) { onData(combine(fileExams, null, 'off')); return; }
 
         onData(combine(fileExams, cache && cache.values, cache ? 'cached' : 'loading', cache && cache.savedAt));
         fetchSheetValues().then(function (values) {
@@ -192,5 +287,13 @@ var ExamSource = (function () {
       });
   }
 
-  return { load: load, parseSheet: parseSheet, isEnabled: function () { return !!sheetsUrl(); } };
+  return {
+    load: load,
+    parseSheet: parseSheet,
+    enrich: enrich,
+    normalizeDifficulty: normalizeDifficulty,
+    DIFFICULTIES: DIFFICULTIES,
+    EXAM_TYPES: EXAM_TYPES,
+    isEnabled: function () { return !!sheetsUrl(); }
+  };
 })();

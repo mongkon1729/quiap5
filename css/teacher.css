@@ -279,6 +279,30 @@ table.plain td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
   line-height: 1.5;
   white-space: pre;
 }
+/* curriculum meta */
+.meta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px 20px;
+  margin: 0;
+  font-size: 14px;
+}
+@media (min-width: 700px) { .meta.wide { grid-template-columns: 1fr 1fr; } }
+.meta > div { display: grid; grid-template-columns: 128px 1fr; gap: 8px; padding: 3px 0; border-bottom: 1px dashed var(--line-soft, rgba(128,128,128,.35)); }
+.meta dt { color: var(--ink-soft); }
+.meta dd { margin: 0; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.meta .muted { color: var(--ink-soft); font-weight: 400; }
+.paper-head { padding: 18px; margin-bottom: 18px; }
+.paper-head .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.bank-card .tags, .draft-meta .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.draft-meta { margin: 10px 0 0; padding: 12px; border-radius: var(--radius-sm); background: var(--paper); border: 1px dashed var(--ink-soft); }
+
+.item-table td { font-size: 14px; }
+.item-table th, .item-table td { white-space: nowrap; }
+.item-table td:last-child { white-space: normal; min-width: 220px; }
+.item-table tr.flag td { background: var(--wrong-bg); }
+.item-table .muted { color: var(--ink-soft); }
+
 /* import */
 .import-steps { display: grid; grid-template-columns: 1fr; gap: 18px; margin-bottom: 26px; }
 @media (min-width: 1100px) { .import-steps { grid-template-columns: 1fr 1fr; align-items: start; } }

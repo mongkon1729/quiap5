@@ -1,4 +1,4 @@
-// ===== ห้องติว ป.5 : สคริปต์รับคะแนนและข้อสอบ (เวอร์ชัน 3) =====
+// ===== ห้องติว ป.5 : สคริปต์รับคะแนนและข้อสอบ (เวอร์ชัน 4) =====
 // 1) เปลี่ยนรหัสด้านล่างเป็นรหัสลับของครูเอง (ใช้เปิดหน้าครู) ห้ามบอกนักเรียน
 var TEACHER_KEY = 'เปลี่ยนเป็นรหัสลับของครู';
 
@@ -8,23 +8,34 @@ var HEADERS = ['timestamp', 'student', 'examId', 'examTitle', 'score', 'answered
 
 var EXAM_SHEET_NAME = 'ข้อสอบ';
 var EXAM_HEADERS = ['ชุดข้อสอบ', 'วิชา', 'เวลา(นาที)', 'หัวข้อ', 'ตัวชี้วัด', 'Bloom', 'คำถาม',
-  'ก', 'ข', 'ค', 'ง', 'คำตอบ', 'คำอธิบาย', 'รูปภาพ'];
+  'ก', 'ข', 'ค', 'ง', 'คำตอบ', 'คำอธิบาย', 'รูปภาพ',
+  'ความยาก', 'ระดับชั้น', 'กลุ่มสาระ', 'รหัสวิชา', 'สาระ', 'มาตรฐาน',
+  'หน่วยการเรียนรู้', 'เรื่อง', 'ประเภทการสอบ', 'ความยากของชุด'];
+
+// Adds any missing columns to the right of the header row, so older sheets keep working.
+function examHeaders_(sheet, wanted) {
+  var lastCol = Math.max(sheet.getLastColumn(), 1);
+  var header = sheet.getLastRow() > 0 ? sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0] : [];
+  while (header.length && header[header.length - 1] === '') header.pop();
+  var missing = wanted.filter(function (h) { return h && header.indexOf(h) < 0; });
+  if (missing.length) {
+    sheet.getRange(1, header.length + 1, 1, missing.length).setValues([missing]).setFontWeight('bold');
+    header = header.concat(missing);
+  }
+  if (sheet.getFrozenRows() !== 1) sheet.setFrozenRows(1);
+  return header;
+}
 
 function getExamSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(EXAM_SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(EXAM_SHEET_NAME);
-    sheet.getRange(1, 1, 1, EXAM_HEADERS.length).setValues([EXAM_HEADERS]).setFontWeight('bold');
-    sheet.setFrozenRows(1);
-  }
+  var sheet = ss.getSheetByName(EXAM_SHEET_NAME) || ss.insertSheet(EXAM_SHEET_NAME);
+  examHeaders_(sheet, EXAM_HEADERS);
   return sheet;
 }
 
 function readExams_() {
   var sheet = getExamSheet_();
-  if (sheet.getLastRow() === 0) return [];
-  return sheet.getRange(1, 1, sheet.getLastRow(), Math.max(sheet.getLastColumn(), 1)).getDisplayValues();
+  return sheet.getRange(1, 1, Math.max(sheet.getLastRow(), 1), Math.max(sheet.getLastColumn(), 1)).getDisplayValues();
 }
 
 function getSheet_() {
@@ -51,29 +62,43 @@ function json_(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// data.records: [{ 'ชุดข้อสอบ': ..., 'คำถาม': ..., ... }] one per question
 function importExams_(data) {
   if (data.key !== TEACHER_KEY) return json_({ ok: false, error: 'unauthorized' });
-  var rows = (data.rows || []).slice(0, 500).map(function (row) {
-    var out = [];
-    for (var c = 0; c < EXAM_HEADERS.length; c++) out.push(clip_(row[c], 1000));
-    return out;
-  });
+  var records = (data.records || []).slice(0, 500);
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
     var sheet = getExamSheet_();
-    var existing = {};
-    readExams_().slice(1).forEach(function (r) { existing[r[0] + '|' + r[6]] = true; });
-    var lastTitle = '';
-    var fresh = rows.filter(function (r) {
-      lastTitle = r[0] || lastTitle;
-      return r[6] && !existing[lastTitle + '|' + r[6]];
+    var wanted = [];
+    records.forEach(function (r) {
+      Object.keys(r).forEach(function (k) { if (wanted.indexOf(k) < 0) wanted.push(clip_(k, 40)); });
     });
-    if (fresh.length) {
-      sheet.getRange(sheet.getLastRow() + 1, 1, fresh.length, EXAM_HEADERS.length)
-        .setNumberFormat('@').setValues(fresh);
+    var header = examHeaders_(sheet, wanted);
+    var titleCol = header.indexOf('ชุดข้อสอบ');
+    var questionCol = header.indexOf('คำถาม');
+
+    var existing = {};
+    var lastTitle = '';
+    readExams_().slice(1).forEach(function (row) {
+      lastTitle = row[titleCol] || lastTitle;
+      existing[lastTitle + '|' + row[questionCol]] = true;
+    });
+
+    var rows = [];
+    records.forEach(function (r) {
+      var title = clip_(r['ชุดข้อสอบ'], 200);
+      var question = clip_(r['คำถาม'], 1000);
+      if (!title || !question || existing[title + '|' + question]) return;
+      existing[title + '|' + question] = true;
+      rows.push(header.map(function (h) { return clip_(r[h], 1000); }));
+    });
+
+    if (rows.length) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, header.length)
+        .setNumberFormat('@').setValues(rows);
     }
-    return json_({ ok: true, added: fresh.length });
+    return json_({ ok: true, added: rows.length });
   } finally {
     lock.releaseLock();
   }
@@ -82,6 +107,7 @@ function importExams_(data) {
 function doPost(e) {
   var data = JSON.parse(e.postData.contents);
   if (data.action === 'importExams') return importExams_(data);
+  if (!data.student || !data.examId) return json_({ ok: false, error: 'missing fields' });
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -115,7 +141,7 @@ function doPost(e) {
 
 function doGet(e) {
   if (e.parameter.action === 'exams') {
-    return json_({ ok: true, values: readExams_() });
+    return json_({ ok: true, version: 4, values: readExams_() });
   }
   if (!e.parameter.key || e.parameter.key !== TEACHER_KEY) {
     return json_({ ok: false, error: 'unauthorized' });

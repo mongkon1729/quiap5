@@ -137,6 +137,16 @@
     }
   }
 
+  function examTags(exam) {
+    var tags = [];
+    if (exam.examType) tags.push('<span class="pill pill-pink">' + escapeHtml(exam.examType) + '</span>');
+    if (exam.difficulty) {
+      var cls = exam.difficulty === 'ง่าย' ? 'pill-mint' : (exam.difficulty === 'ยาก' ? 'pill-peach' : 'pill-yellow');
+      tags.push('<span class="pill ' + cls + '">' + escapeHtml(exam.difficulty) + '</span>');
+    }
+    return tags.length ? '<div class="exam-tags">' + tags.join('') + '</div>' : '';
+  }
+
   function renderStartScreen() {
     renderUserChip();
     el.examCount.textContent = examsData.exams.length + ' ชุด';
@@ -152,8 +162,10 @@
           '<span class="pill">' + exam.questions.length + ' ข้อ</span>' +
         '</div>' +
         '<div class="exam-card-body">' +
+          examTags(exam) +
           '<h3>' + escapeHtml(exam.title) + '</h3>' +
-          '<div class="exam-meta"><span>' + escapeHtml(exam.subject) + '</span>' +
+          (exam.lesson || exam.unit ? '<p class="exam-lesson">' + escapeHtml(exam.lesson ? 'เรื่อง ' + exam.lesson : exam.unit) + '</p>' : '') +
+          '<div class="exam-meta"><span>' + escapeHtml([exam.subject, exam.grade].filter(Boolean).join(' • ')) + '</span>' +
           '<span>จับเวลา ' + (exam.timeLimitMinutes || 15) + ' นาที</span></div>' +
           (best
             ? '<div class="best-row"><span>คะแนนสูงสุด</span><strong>' + best.score + '/' + best.total + '</strong></div>' +
@@ -186,7 +198,8 @@
 
   function openIdentifyScreen(exam) {
     state.selectedExam = exam;
-    el.identifyExamTitle.textContent = exam.title + ' • ' + exam.questions.length + ' ข้อ';
+    el.identifyExamTitle.textContent = [exam.title, exam.lesson ? 'เรื่อง ' + exam.lesson : '', exam.questions.length + ' ข้อ']
+      .filter(Boolean).join(' • ');
     el.timerHint.textContent = 'นับถอยหลังทั้งชุด ' + (exam.timeLimitMinutes || 15) + ' นาที';
     el.identifyForm.reset();
     el.identifyError.hidden = true;

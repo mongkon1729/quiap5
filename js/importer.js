@@ -5,8 +5,8 @@ var ExamImport = (function () {
 
   var RE = {
     exam: new RegExp('^(?:ชุดข้อสอบ|ชื่อชุด|ชุด)' + SEP + '(.+)$'),
-    subject: new RegExp('^วิชา' + SEP + '(.+)$'),
     minutes: new RegExp('^(?:เวลาสอบ|เวลา)' + SEP + '(\\d+)'),
+    difficulty: new RegExp('^(?:ระดับความยาก|ความยาก)' + SEP + '(.+)$'),
     question: /^(?:ข้อ(?:ที่)?\s*)?(\d{1,3})\s*[.)]\s*(.+)$/,
     choice: /^\(?([กขคงabcdABCD])\s*[.)]\s*(.+)$/,
     answer: new RegExp('^(?:คำตอบ|ตอบ|เฉลย|answer)' + SEP + '(.+)$', 'i'),
@@ -36,8 +36,34 @@ var ExamImport = (function () {
       .trim();
   }
 
+  // Set-level curriculum lines, e.g. "หน่วยการเรียนรู้: หน่วยที่ 2 เศรษฐกิจน่ารู้"
+  var SET_LINES = [
+    ['subject', /^(?:รายวิชา|วิชา)$/],
+    ['courseCode', /^รหัสวิชา$/],
+    ['grade', /^(?:ระดับชั้น|ชั้น)$/],
+    ['learningArea', /^กลุ่มสาระ(?:การเรียนรู้)?$/],
+    ['strand', /^สาระ(?:การเรียนรู้)?$/],
+    ['standard', /^มาตรฐาน(?:การเรียนรู้)?$/],
+    ['unit', /^(?:หน่วยการเรียนรู้|หน่วยที่|หน่วย)$/],
+    ['lesson', /^เรื่อง$/],
+    ['examType', /^(?:ประเภทการสอบ|ประเภทข้อสอบ|ประเภท)$/]
+  ];
+  var SET_KEYS = ['subject', 'courseCode', 'grade', 'learningArea', 'strand', 'standard', 'unit', 'lesson', 'examType', 'difficulty', 'indicator'];
+
+  function matchSetLine(line) {
+    var m = line.match(/^([^:：]{1,30})\s*[:：]\s*(.+)$/);
+    if (!m) return null;
+    var label = m[1].trim();
+    for (var i = 0; i < SET_LINES.length; i++) {
+      if (SET_LINES[i][1].test(label)) return { key: SET_LINES[i][0], value: m[2].trim() };
+    }
+    return null;
+  }
+
   function newExam(title) {
-    return { title: title, subject: '', minutes: 0, questions: [] };
+    var e = { title: title, minutes: 0, questions: [] };
+    SET_KEYS.forEach(function (k) { e[k] = ''; });
+    return e;
   }
 
   function parseText(text, fallbackTitle) {
@@ -56,16 +82,23 @@ var ExamImport = (function () {
       var line = cleanLine(rawLine);
       if (!line) return;
       var m;
+      var setLine;
 
       if ((m = line.match(RE.exam))) {
         exam = newExam(m[1].trim());
         exams.push(exam);
         q = null;
         lastField = null;
-      } else if ((m = line.match(RE.subject)) && !q) {
-        currentExam().subject = m[1].trim();
+      } else if ((setLine = matchSetLine(line))) {
+        currentExam()[setLine.key] = setLine.value;
+        lastField = null;
       } else if ((m = line.match(RE.minutes)) && !q) {
         currentExam().minutes = parseInt(m[1], 10) || 0;
+      } else if ((m = line.match(RE.difficulty))) {
+        if (q) q.difficulty = m[1].trim(); else currentExam().difficulty = m[1].trim();
+        lastField = null;
+      } else if ((m = line.match(RE.indicator)) && !q) {
+        currentExam().indicator = m[1].trim();
       } else if ((m = line.match(RE.answer)) && q) {
         q.answerRaw = m[1].trim();
         lastField = 'answer';
@@ -84,7 +117,7 @@ var ExamImport = (function () {
         q.choices.push(m[2].trim());
         lastField = 'choice';
       } else if ((m = line.match(RE.question))) {
-        q = { no: m[1], question: m[2].trim(), choices: [], answerRaw: '', explanation: '', indicator: '', bloom: '', topic: '', image: '' };
+        q = { no: m[1], question: m[2].trim(), choices: [], answerRaw: '', explanation: '', indicator: '', bloom: '', topic: '', image: '', difficulty: '' };
         currentExam().questions.push(q);
         lastField = 'question';
       } else if (q && lastField === 'question') {
@@ -118,13 +151,19 @@ var ExamImport = (function () {
           answer: answer,
           explanation: q.explanation || '',
           topic: q.topic || '',
-          indicator: q.indicator || '',
+          indicator: q.indicator || e.indicator || '',
           bloom: q.bloom || '',
-          image: q.image || ''
+          image: q.image || '',
+          difficulty: ExamSource.normalizeDifficulty(q.difficulty)
         });
       });
       if (!e.questions.length) issues.push('"' + e.title + '": ไม่พบข้อสอบในชุดนี้');
-      if (good.length) out.push({ title: e.title, subject: e.subject, minutes: e.minutes, questions: good });
+      if (!good.length) return;
+      var exam = { title: e.title, minutes: e.minutes, questions: good };
+      SET_KEYS.forEach(function (k) { if (k !== 'indicator') exam[k] = e[k] || ''; });
+      exam.difficulty = ExamSource.normalizeDifficulty(exam.difficulty);
+      ExamSource.enrich(exam);
+      out.push(exam);
     });
     return { exams: out, issues: issues };
   }
@@ -134,7 +173,7 @@ var ExamImport = (function () {
     var list = Array.isArray(data) ? [{ title: fallbackTitle, questions: data }] : (data.exams || [data]);
     list.forEach(function (e) {
       var exam = newExam(String(e.title || fallbackTitle));
-      exam.subject = e.subject || '';
+      SET_KEYS.forEach(function (k) { if (e[k]) exam[k] = String(e[k]); });
       exam.minutes = parseInt(e.timeLimitMinutes || e.minutes, 10) || 0;
       (e.questions || []).forEach(function (q, i) {
         var choices = (q.choices || []).map(function (c) { return String(c && c.text != null ? c.text : c).trim(); });
@@ -148,7 +187,8 @@ var ExamImport = (function () {
           topic: q.topic || '',
           indicator: q.indicator || '',
           bloom: q.bloom || '',
-          image: q.image || ''
+          image: q.image || '',
+          difficulty: q.difficulty || ''
         });
       });
       exams.push(exam);
@@ -161,9 +201,11 @@ var ExamImport = (function () {
     var parsed = ExamSource.parseSheet(rows);
     return {
       exams: parsed.exams.map(function (e) {
-        return { title: e.title, subject: e.subject, minutes: e.timeLimitMinutes, questions: e.questions.map(function (q) {
-          return { question: q.question, choices: q.choices, answer: q.answer, explanation: q.explanation, topic: q.topic, indicator: q.indicator, bloom: q.bloom, image: q.image || '' };
+        var exam = { title: e.title, minutes: e.timeLimitMinutes, questions: e.questions.map(function (q) {
+          return { question: q.question, choices: q.choices, answer: q.answer, explanation: q.explanation, topic: q.topic, indicator: q.indicator, bloom: q.bloom, image: q.image || '', difficulty: q.difficulty || '' };
         }) };
+        SET_KEYS.forEach(function (k) { if (k !== 'indicator') exam[k] = e[k] || ''; });
+        return ExamSource.enrich(exam);
       }),
       issues: parsed.issues.map(function (it) { return 'แถว ' + it.row + ': ' + it.message; })
     };
@@ -228,29 +270,56 @@ var ExamImport = (function () {
     return parseText(trimmed, fallbackTitle);
   }
 
-  var HEADERS = ['ชุดข้อสอบ', 'วิชา', 'เวลา(นาที)', 'หัวข้อ', 'ตัวชี้วัด', 'Bloom', 'คำถาม', 'ก', 'ข', 'ค', 'ง', 'คำตอบ', 'คำอธิบาย', 'รูปภาพ'];
   var LETTERS = ['ก', 'ข', 'ค', 'ง'];
 
-  function toRows(exams) {
-    var rows = [];
+  // One record per question, keyed by the sheet's column headers. Set-level info goes on the first row of each set.
+  function toRecords(exams) {
+    var records = [];
     exams.forEach(function (e) {
       e.questions.forEach(function (q, i) {
-        rows.push([
-          e.title,
-          i === 0 ? (e.subject || '') : '',
-          i === 0 && e.minutes ? String(e.minutes) : '',
-          q.topic, q.indicator, q.bloom, q.question,
-          q.choices[0], q.choices[1], q.choices[2], q.choices[3],
-          LETTERS[q.answer], q.explanation, q.image
-        ]);
+        var r = {
+          'ชุดข้อสอบ': e.title,
+          'หัวข้อ': q.topic,
+          'ตัวชี้วัด': q.indicator,
+          'Bloom': q.bloom,
+          'ความยาก': q.difficulty,
+          'คำถาม': q.question,
+          'ก': q.choices[0], 'ข': q.choices[1], 'ค': q.choices[2], 'ง': q.choices[3],
+          'คำตอบ': LETTERS[q.answer],
+          'คำอธิบาย': q.explanation,
+          'รูปภาพ': q.image
+        };
+        if (i === 0) {
+          r['วิชา'] = e.subject;
+          r['เวลา(นาที)'] = e.minutes ? String(e.minutes) : '';
+          r['ระดับชั้น'] = e.grade;
+          r['กลุ่มสาระ'] = e.learningArea;
+          r['รหัสวิชา'] = e.courseCode;
+          r['สาระ'] = e.strand;
+          r['มาตรฐาน'] = e.standard;
+          r['หน่วยการเรียนรู้'] = e.unit;
+          r['เรื่อง'] = e.lesson;
+          r['ประเภทการสอบ'] = e.examType;
+          r['ความยากของชุด'] = e.difficultyDerived ? '' : e.difficulty;
+        }
+        records.push(r);
       });
     });
-    return rows;
+    return records;
   }
 
   var EXAMPLE =
-    'ชุด: ภูมิศาสตร์ประเทศไทย\n' +
-    'วิชา: สังคมศึกษา\n' +
+    'ชุด: ภูมิศาสตร์ประเทศไทย หลังเรียน\n' +
+    'ระดับชั้น: ป.5\n' +
+    'กลุ่มสาระ: สังคมศึกษา ศาสนา และวัฒนธรรม\n' +
+    'รายวิชา: สังคมศึกษา 5\n' +
+    'รหัสวิชา: ส15101\n' +
+    'สาระ: สาระที่ 5 ภูมิศาสตร์\n' +
+    'มาตรฐาน: ส 5.1\n' +
+    'หน่วยการเรียนรู้: หน่วยที่ 6 ภูมิลักษณ์ของประเทศไทย\n' +
+    'เรื่อง: ลักษณะทางกายภาพของภาคต่างๆ\n' +
+    'ประเภทการสอบ: หลังเรียน\n' +
+    'ความยาก: ปานกลาง\n' +
     'เวลา: 10\n\n' +
     '1. ภาคใดของประเทศไทยมีพื้นที่มากที่สุด\n' +
     'ก. ภาคเหนือ\n' +
@@ -260,30 +329,37 @@ var ExamImport = (function () {
     'ตอบ: ข\n' +
     'อธิบาย: ภาคตะวันออกเฉียงเหนือมีพื้นที่มากที่สุด ประมาณหนึ่งในสามของประเทศ\n' +
     'ตัวชี้วัด: ส 5.1 ป.5/1\n' +
-    'Bloom: ความจำ\n\n' +
-    '2. แม่น้ำสายหลักที่ไหลผ่านภาคกลางคือแม่น้ำใด\n' +
-    'ก. แม่น้ำโขง\n' +
-    'ข. แม่น้ำเจ้าพระยา\n' +
-    'ค. แม่น้ำสาละวิน\n' +
-    'ง. แม่น้ำมูล\n' +
-    'ตอบ: ข\n' +
-    'อธิบาย: แม่น้ำเจ้าพระยาไหลผ่านภาคกลาง เป็นแหล่งน้ำสำคัญของการทำนา\n' +
+    'Bloom: ความจำ\n' +
+    'ความยาก: ง่าย\n\n' +
+    '2. ถ้าต้องการทำนาข้าวให้ได้ผลดี ควรเลือกพื้นที่ในภาคใดมากที่สุด\n' +
+    'ก. ภาคกลาง เพราะเป็นที่ราบลุ่มแม่น้ำ มีน้ำอุดมสมบูรณ์\n' +
+    'ข. ภาคเหนือ เพราะมีภูเขาสูงและอากาศหนาว\n' +
+    'ค. ภาคใต้ เพราะมีฝนตกชุกเกือบทั้งปี\n' +
+    'ง. ภาคตะวันออก เพราะติดชายฝั่งทะเล\n' +
+    'ตอบ: ก\n' +
+    'อธิบาย: ภาคกลางเป็นที่ราบลุ่มแม่น้ำเจ้าพระยา ดินอุดมสมบูรณ์และมีน้ำพอสำหรับทำนา\n' +
     'ตัวชี้วัด: ส 5.1 ป.5/2\n' +
-    'Bloom: ความเข้าใจ\n';
+    'Bloom: วิเคราะห์\n' +
+    'ความยาก: ยาก\n';
 
   var AI_PROMPT =
-    'ช่วยออกข้อสอบปรนัย 4 ตัวเลือก สำหรับนักเรียนชั้น ป.5\n' +
-    'วิชา: [ใส่วิชา]\n' +
-    'เรื่อง: [ใส่เรื่อง/หน่วยการเรียนรู้]\n' +
-    'จำนวน: [ใส่จำนวน] ข้อ\n' +
-    'ตัวชี้วัด: [ใส่ตัวชี้วัด ถ้ามี]\n\n' +
+    'ช่วยออกข้อสอบปรนัย 4 ตัวเลือก ตามหลักสูตรแกนกลางการศึกษาขั้นพื้นฐาน พ.ศ. 2551 (ฉบับปรับปรุง พ.ศ. 2560)\n' +
+    'ระดับชั้น: [เช่น ป.5]\n' +
+    'รายวิชา: [เช่น สังคมศึกษา 5] รหัสวิชา: [เช่น ส15101]\n' +
+    'หน่วยการเรียนรู้: [ชื่อหน่วย]\n' +
+    'เรื่อง: [ชื่อเรื่อง]\n' +
+    'ตัวชี้วัด: [เช่น ส 5.1 ป.5/1, ป.5/2]\n' +
+    'ประเภทการสอบ: [ก่อนเรียน / ระหว่างเรียน / หลังเรียน / กลางภาค / ปลายภาค / ฝึกทำ]\n' +
+    'จำนวน: [ใส่จำนวน] ข้อ\n\n' +
     'เงื่อนไข:\n' +
-    '- ภาษาง่าย เหมาะกับเด็ก ป.5 ตัวเลือกที่ผิดต้องดูเป็นไปได้ ไม่ตลกหรือชัดเกินไป\n' +
+    '- ภาษาเหมาะกับวัยของผู้เรียน ตัวเลือกที่ผิดต้องดูเป็นไปได้ ไม่ตลกหรือชัดเกินไป\n' +
+    '- ทุกข้อต้องวัดตัวชี้วัดที่กำหนด และระบุตัวชี้วัดของข้อนั้น\n' +
     '- กระจายคำตอบให้มีทั้ง ก ข ค ง\n' +
-    '- ทุกข้อต้องมีคำอธิบายสั้นๆ ว่าทำไมข้อนั้นถูก\n' +
-    '- Bloom ใช้คำใดคำหนึ่ง: ความจำ, ความเข้าใจ, ประยุกต์ใช้, วิเคราะห์\n\n' +
+    '- ทุกข้อมีคำอธิบายสั้นๆ ว่าทำไมข้อนั้นถูก\n' +
+    '- Bloom ใช้คำใดคำหนึ่ง: ความจำ, ความเข้าใจ, ประยุกต์ใช้, วิเคราะห์, ประเมินค่า, สร้างสรรค์\n' +
+    '- ความยาก ใช้คำใดคำหนึ่ง: ง่าย, ปานกลาง, ยาก และให้ทั้งชุดมีสัดส่วนประมาณ ง่าย 30% ปานกลาง 50% ยาก 20%\n\n' +
     'ตอบเป็นข้อความธรรมดาตามรูปแบบด้านล่างนี้เท่านั้น ไม่ต้องมีคำนำ ไม่ต้องใช้ตาราง ไม่ต้องใช้ตัวหนา:\n\n' +
     EXAMPLE;
 
-  return { parse: parse, toRows: toRows, example: EXAMPLE, aiPrompt: AI_PROMPT };
+  return { parse: parse, toRecords: toRecords, example: EXAMPLE, aiPrompt: AI_PROMPT };
 })();

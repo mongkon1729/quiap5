@@ -79,6 +79,38 @@
     return Art.color(Math.abs(h));
   }
 
+  function diffPill(d, prefix) {
+    if (!d) return '';
+    var cls = d === 'ง่าย' ? 'pill-mint' : (d === 'ยาก' ? 'pill-peach' : 'pill-yellow');
+    return '<span class="pill ' + cls + '">' + (prefix || '') + esc(d) + '</span>';
+  }
+
+  function typePill(t) {
+    return t ? '<span class="pill pill-pink">' + esc(t) + '</span>' : '';
+  }
+
+  // [label, value] pairs of the set's curriculum info, in the order used on Thai exam papers.
+  function metaRows(e) {
+    return [
+      ['ระดับชั้น', e.grade],
+      ['กลุ่มสาระการเรียนรู้', e.learningArea],
+      ['รายวิชา', [e.subject, e.courseCode ? '(' + e.courseCode + ')' : ''].join(' ').trim()],
+      ['สาระ', e.strand],
+      ['มาตรฐาน', e.standard],
+      ['ตัวชี้วัด', (e.indicators || []).join(', ')],
+      ['หน่วยการเรียนรู้', e.unit],
+      ['เรื่อง', e.lesson],
+      ['ประเภทการสอบ', e.examType],
+      ['ความยาก', e.difficulty ? e.difficulty + (e.difficultyDerived ? ' (ประเมินจากรายข้อ)' : '') : '']
+    ];
+  }
+
+  function metaTable(e, showEmpty) {
+    return '<dl class="meta">' + metaRows(e).filter(function (r) { return showEmpty || r[1]; }).map(function (r) {
+      return '<div><dt>' + r[0] + '</dt><dd>' + (r[1] ? esc(r[1]) : '<span class="muted">ยังไม่ระบุ</span>') + '</dd></div>';
+    }).join('') + '</dl>';
+  }
+
   function examIndex(examId) {
     for (var i = 0; i < state.exams.length; i++) if (state.exams[i].id === examId) return i;
     return 0;
@@ -138,7 +170,7 @@
     var thisWeek = 0;
 
     state.exams.forEach(function (e) {
-      exams[e.id] = { exam: e, attempts: 0, completed: 0, sumPct: 0, wrong: {} };
+      exams[e.id] = { exam: e, attempts: 0, completed: 0, sumPct: 0, wrong: {}, runs: [] };
     });
 
     rows.forEach(function (r) {
@@ -161,6 +193,7 @@
       if (es) {
         es.completed++;
         es.sumPct += p;
+        es.runs.push({ score: r.score, wrong: r.wrong, student: key, time: r.time, pct: p });
         r.wrong.forEach(function (qid) { es.wrong[qid] = (es.wrong[qid] || 0) + 1; });
       }
     });
@@ -215,8 +248,9 @@
       t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
       return ((t ^ t >>> 14) >>> 0) / 4294967296;
     }
-    var names = ['1 ต้นกล้า', '2 ใบเตย', '3 ภูผา', '4 น้ำฝน', '5 ข้าวหอม', '6 ปลื้ม', '7 มะปราง', '8 ธันวา',
-      '9 แพรวา', '10 นภัส', '11 ก้องภพ', '12 ชมพู่', '13 อชิ', '14 ขิม'];
+    var names = ['ต้นกล้า', 'ใบเตย', 'ภูผา', 'น้ำฝน', 'ข้าวหอม', 'ปลื้ม', 'มะปราง', 'ธันวา', 'แพรวา', 'นภัส',
+      'ก้องภพ', 'ชมพู่', 'อชิ', 'ขิม', 'ฟ้าใส', 'ต้นข้าว', 'เมฆ', 'ปูเป้', 'น้ำหวาน', 'ภูมิ', 'ใบบัว', 'กันต์',
+      'มินนี่', 'ตะวัน', 'พลอย', 'ไอซ์', 'แสนดี', 'บุ๋มบิ๋ม'].map(function (n, i) { return (i + 1) + ' ' + n; });
     var rows = [];
     var now = Date.now();
     names.forEach(function (name, ni) {
@@ -227,7 +261,8 @@
         if (!exam) return;
         var wrong = [];
         exam.questions.forEach(function (q, qi) {
-          var difficulty = ((qi * 37 + exam.id.length * 11) % 10) / 20;
+          var difficulty = { 'ง่าย': 0.05, 'ปานกลาง': 0.2, 'ยาก': 0.4 }[q.difficulty] ||
+            ((qi * 37 + exam.id.length * 11) % 10) / 20;
           if (rand() > skill + 0.12 * t - difficulty) wrong.push(q.id);
         });
         var total = exam.questions.length;
@@ -314,6 +349,8 @@
         '<div style="font-size:14px;color:var(--ink-soft)">' + esc(it.q.question) + '</div>' +
         bar(it.wrongRate, 'low') + '</div>';
     }).join('');
+
+    html += prePostBlock();
 
     var needHelp = s.students.filter(function (st) { return st.avg != null && st.avg < 50; });
 
@@ -440,20 +477,128 @@
         }).join('') + '</div></div>';
     }
 
-    html += '<div class="two-col block">' + masteryPanel('ตามตัวชี้วัด', masteryBy('indicator', examId)) + masteryPanel('ตามระดับการคิด (Bloom)', masteryBy('bloom', examId)) + '</div>';
+    var byDifficulty = masteryBy('difficulty', examId).filter(function (m) { return m.key !== 'ไม่ระบุ'; });
+    html += '<div class="two-col block">' + masteryPanel('ตามตัวชี้วัด', masteryBy('indicator', examId)) + masteryPanel('ตามระดับการคิด (Bloom)', masteryBy('bloom', examId)) +
+      (byDifficulty.length ? masteryPanel('ตามความยากที่ครูกำหนด', byDifficulty) : '') + '</div>';
+
+    var stats = itemStats(es);
+    var flagged = stats.filter(function (it) { return it.flags.length; }).length;
+    html += '<div class="block"><div class="block-head"><h2>ค่าความยาก (p) และค่าอำนาจจำแนก (r) รายข้อ</h2><span class="muted">จาก ' + es.completed + ' ครั้งที่ทำครบชุด</span></div>' +
+      '<div class="panel card"><p class="note" style="margin-top:0">p = สัดส่วนผู้ตอบถูก (ข้อที่ดีควรอยู่ระหว่าง 0.20-0.80) • r = อำนาจจำแนกแบบกลุ่มสูง-กลุ่มต่ำ 27% (ควรตั้งแต่ 0.20 ขึ้นไป)' +
+        (es.completed < 10 ? ' • ค่า r จะแสดงเมื่อมีผู้ทำครบชุดอย่างน้อย 10 ครั้ง' : '') +
+        (flagged ? ' • <b>มี ' + flagged + ' ข้อที่ควรพิจารณาปรับปรุง</b>' : '') + '</p>' +
+      '<div class="table-wrap"><table class="plain item-table"><thead><tr><th>ข้อ</th><th>ตัวชี้วัด / Bloom</th><th>ความยากที่กำหนด</th><th>p</th><th>แปลผล p</th><th>r</th><th>แปลผล r</th><th>ข้อสังเกต</th></tr></thead><tbody>' +
+      stats.map(function (it) {
+        return '<tr' + (it.flags.length ? ' class="flag"' : '') + '><td class="num"><b>' + it.no + '</b></td>' +
+          '<td>' + esc(it.q.indicator || '-') + (it.q.bloom ? '<br><span class="muted">' + esc(it.q.bloom) + '</span>' : '') + '</td>' +
+          '<td>' + (it.q.difficulty ? diffPill(it.q.difficulty) : '<span class="muted">-</span>') + '</td>' +
+          '<td class="num">' + it.p.toFixed(2) + '</td><td>' + it.pLabel + '</td>' +
+          '<td class="num">' + (it.r == null ? '-' : it.r.toFixed(2)) + '</td><td>' + (it.rLabel || '<span class="muted">ข้อมูลยังน้อย</span>') + '</td>' +
+          '<td>' + (it.flags.length ? esc(it.flags.join(', ')) : '<span class="muted">-</span>') + '</td></tr>';
+      }).join('') + '</tbody></table></div></div></div>';
 
     var items = s.items.filter(function (it) { return it.exam.id === examId; });
-    html += '<div class="block"><div class="block-head"><h2>รายข้อ เรียงจากผิดมากไปน้อย</h2><span class="muted">จาก ' + es.completed + ' ครั้ง</span></div>' +
+    html += '<div class="block"><div class="block-head"><h2>รายข้อ เรียงจากผิดมากไปน้อย</h2></div>' +
       '<div class="panel card">' + items.map(function (it) {
         return '<div class="item"><span class="qno">' + it.no + '</span><div>' +
           '<p class="qtext">' + esc(it.q.question) + '</p>' +
           '<div class="tags">' + (it.q.indicator ? '<span class="pill">' + esc(it.q.indicator) + '</span>' : '') +
-          (it.q.bloom ? '<span class="pill pill-blue">' + esc(it.q.bloom) + '</span>' : '') +
+          (it.q.bloom ? '<span class="pill pill-blue">' + esc(it.q.bloom) + '</span>' : '') + diffPill(it.q.difficulty) +
           '<span class="pill pill-mint">ตอบ ' + LETTERS[it.q.answer] + '. ' + esc(it.q.choices[it.q.answer]) + '</span></div>' +
           '<div class="row-top"><span>ตอบผิด</span><span class="num">' + it.wrongRate + '%</span></div>' + bar(it.wrongRate, it.wrongRate >= 50 ? 'low' : (it.wrongRate >= 25 ? 'mid' : 'good')) +
           '</div></div>';
       }).join('') + '</div></div>';
     return html;
+  }
+
+  // Pairs "ก่อนเรียน" and "หลังเรียน" sets that share a หน่วย (or เรื่อง) and compares students who did both.
+  function prePostBlock() {
+    var groups = {};
+    state.exams.forEach(function (e) {
+      var key = (e.unit || e.lesson || '').trim();
+      if (!key || (e.examType !== 'ก่อนเรียน' && e.examType !== 'หลังเรียน')) return;
+      var g = groups[key] || (groups[key] = { key: key, pre: [], post: [] });
+      g[e.examType === 'ก่อนเรียน' ? 'pre' : 'post'].push(e.id);
+    });
+    var rows = Object.keys(groups).map(function (k) { return groups[k]; }).filter(function (g) { return g.pre.length && g.post.length; });
+    if (!rows.length) return '';
+
+    function runsOf(ids) {
+      var out = {};
+      ids.forEach(function (id) {
+        var es = state.stats.exams[id];
+        (es ? es.runs : []).forEach(function (run) {
+          (out[run.student] = out[run.student] || []).push(run);
+        });
+      });
+      return out;
+    }
+
+    var html = '<div class="block"><div class="block-head"><h2>เปรียบเทียบก่อนเรียน-หลังเรียน</h2><span class="muted">เฉพาะนักเรียนที่ทำครบทั้งสองชุด</span></div><div class="rows panel card">';
+    html += rows.map(function (g) {
+      var pre = runsOf(g.pre);
+      var post = runsOf(g.post);
+      var both = Object.keys(pre).filter(function (st) { return post[st]; });
+      if (!both.length) {
+        return '<div class="row-item"><div class="row-top"><strong>' + esc(g.key) + '</strong><span class="num">ยังไม่มีนักเรียนทำครบทั้งสองชุด</span></div></div>';
+      }
+      var sumPre = 0;
+      var sumPost = 0;
+      var improved = 0;
+      both.forEach(function (st) {
+        var first = pre[st].slice().sort(function (a, b) { return a.time - b.time; })[0].pct;
+        var last = post[st].slice().sort(function (a, b) { return b.time - a.time; })[0].pct;
+        sumPre += first;
+        sumPost += last;
+        if (last > first) improved++;
+      });
+      var a = Math.round(sumPre / both.length);
+      var b = Math.round(sumPost / both.length);
+      return '<div class="row-item"><div class="row-top"><strong>' + esc(g.key) + '</strong><span class="num">' + both.length + ' คน • พัฒนาขึ้น ' + improved + ' คน</span></div>' +
+        '<div class="row-top"><span>ก่อนเรียน</span><span class="num">' + a + '%</span></div>' + bar(a, 'mid') +
+        '<div class="row-top"><span>หลังเรียน</span><span class="num">' + b + '% (' + (b - a >= 0 ? '+' : '') + (b - a) + ')</span></div>' + bar(b, 'good') + '</div>';
+    }).join('');
+    return html + '</div></div>';
+  }
+
+  function pLabel(p) {
+    if (p >= 0.81) return 'ง่ายมาก';
+    if (p >= 0.61) return 'ค่อนข้างง่าย';
+    if (p >= 0.41) return 'ปานกลาง';
+    if (p >= 0.21) return 'ค่อนข้างยาก';
+    return 'ยากมาก';
+  }
+
+  function pToLevel(p) {
+    return p >= 0.61 ? 'ง่าย' : (p >= 0.41 ? 'ปานกลาง' : 'ยาก');
+  }
+
+  function rLabel(r) {
+    if (r >= 0.40) return 'ดีมาก';
+    if (r >= 0.30) return 'ดี';
+    if (r >= 0.20) return 'พอใช้';
+    return 'ควรปรับปรุง';
+  }
+
+  // Classical item analysis on completed runs: p = share correct, r = (upper27% correct - lower27% correct) / n.
+  function itemStats(es) {
+    var runs = es.runs.slice().sort(function (a, b) { return b.score - a.score; });
+    var n = runs.length >= 10 ? Math.max(1, Math.round(runs.length * 0.27)) : 0;
+    var upper = runs.slice(0, n);
+    var lower = n ? runs.slice(runs.length - n) : [];
+    function correctIn(group, qid) {
+      return group.filter(function (run) { return run.wrong.indexOf(qid) < 0; }).length;
+    }
+    return es.exam.questions.map(function (q, qi) {
+      var p = 1 - (es.wrong[q.id] || 0) / es.completed;
+      var r = n ? (correctIn(upper, q.id) - correctIn(lower, q.id)) / n : null;
+      var flags = [];
+      if (p > 0.80) flags.push('ง่ายเกินไป');
+      if (p < 0.20) flags.push('ยากเกินไป หรือเฉลยอาจผิด');
+      if (r != null && r < 0.20) flags.push(r < 0 ? 'เด็กเก่งตอบผิดมากกว่า ตรวจเฉลย/ตัวลวง' : 'จำแนกเด็กเก่ง-อ่อนได้น้อย');
+      if (q.difficulty && q.difficulty !== pToLevel(p)) flags.push('ครูกำหนด "' + q.difficulty + '" แต่ผลจริง "' + pToLevel(p) + '"');
+      return { no: qi + 1, q: q, p: p, pLabel: pLabel(p), r: r, rLabel: r == null ? '' : rLabel(r), flags: flags };
+    });
   }
 
   function renderBank() {
@@ -468,9 +613,12 @@
       var bloom = {};
       e.questions.forEach(function (q) { if (q.bloom) bloom[q.bloom] = (bloom[q.bloom] || 0) + 1; });
       return '<article class="bank-card card" style="animation-delay:' + (i * 60) + 'ms"><div class="cover">' + Art.cover(i) + '</div><div class="body">' +
+        '<div class="tags">' + typePill(e.examType) + diffPill(e.difficulty, 'ความยาก ') +
+          (e.grade ? '<span class="pill">' + esc(e.grade) + '</span>' : '') + '</div>' +
         '<h3>' + esc(e.title) + '</h3>' +
         '<div class="exam-meta"><span>' + e.questions.length + ' ข้อ</span><span>จับเวลา ' + (e.timeLimitMinutes || 15) + ' นาที</span>' +
         '<span>' + (e.source === 'sheets' ? 'จาก Google Sheets' : 'จากไฟล์ในเว็บ') + '</span></div>' +
+        metaTable({ subject: e.subject, courseCode: e.courseCode, standard: e.standard, unit: e.unit, lesson: e.lesson, indicators: e.indicators }, false) +
         '<div class="chips" style="margin:0;gap:6px">' + Object.keys(bloom).map(function (b) {
           return '<span class="pill">' + esc(b) + ' ' + bloom[b] + '</span>';
         }).join('') + '</div>' +
@@ -481,7 +629,8 @@
     return html;
   }
 
-  var EXAM_HEADERS = ['ชุดข้อสอบ', 'วิชา', 'เวลา(นาที)', 'หัวข้อ', 'ตัวชี้วัด', 'Bloom', 'คำถาม', 'ก', 'ข', 'ค', 'ง', 'คำตอบ', 'คำอธิบาย', 'รูปภาพ'];
+  var EXAM_HEADERS = ['ชุดข้อสอบ', 'วิชา', 'เวลา(นาที)', 'หัวข้อ', 'ตัวชี้วัด', 'Bloom', 'คำถาม', 'ก', 'ข', 'ค', 'ง', 'คำตอบ', 'คำอธิบาย', 'รูปภาพ',
+    'ความยาก', 'ระดับชั้น', 'กลุ่มสาระ', 'รหัสวิชา', 'สาระ', 'มาตรฐาน', 'หน่วยการเรียนรู้', 'เรื่อง', 'ประเภทการสอบ', 'ความยากของชุด'];
 
   function sheetPanel() {
     if (!SHEETS_URL) {
@@ -502,7 +651,9 @@
       '<div class="status-line">' + status + '<span>' + sh.sheetExams.length + ' ชุด • ' + nQ + ' ข้อ</span></div>';
 
     if (sh.sheetStatus === 'error') {
-      html += '<p class="note" style="margin-top:0">ถ้ายังไม่ได้อัปเดตสคริปต์เป็นเวอร์ชัน 3 ให้ทำตามขั้นตอนที่ 1 ด้านล่างก่อน</p>';
+      html += '<p class="note" style="margin-top:0">ถ้ายังไม่ได้อัปเดตสคริปต์เป็นเวอร์ชัน 4 ให้ทำตามขั้นตอนที่ 1 ด้านล่างก่อน</p>';
+    } else if (sh.scriptVersion && sh.scriptVersion < 4) {
+      html += '<p class="error-text" style="margin-top:4px">สคริปต์ Google ยังเป็นเวอร์ชัน ' + sh.scriptVersion + ' ให้อัปเดตเป็นเวอร์ชัน 4 (ขั้นตอนที่ 1 ด้านล่าง) เพื่อบันทึกข้อมูลหลักสูตร ระดับชั้น หน่วย และความยาก</p>';
     }
     if (sh.issues.length) {
       html += '<div class="error-text" style="margin-top:4px"><b>มี ' + sh.issues.length + ' แถวที่ยังไม่ขึ้นเว็บ</b> แก้ในสเปรดชีตแล้วกด "โหลดข้อสอบใหม่"' +
@@ -517,18 +668,20 @@
 
   function sheetGuide() {
     if (!SHEETS_URL) return '';
-    return '<details class="panel card block guide"' + (state.sheet && state.sheet.sheetExams.length ? '' : ' open') + '>' +
+    var needsUpdate = state.sheet && state.sheet.scriptVersion && state.sheet.scriptVersion < 4;
+    return '<details class="panel card block guide"' + (state.sheet && state.sheet.sheetExams.length && !needsUpdate ? '' : ' open') + '>' +
       '<summary><h2>วิธีเพิ่มข้อสอบผ่าน Google Sheets</h2></summary>' +
       '<ol class="steps" style="margin-top:14px">' +
-      '<li><b>อัปเดตสคริปต์เป็นเวอร์ชัน 3 (ทำครั้งเดียว)</b><br>เปิดสเปรดชีต → ส่วนขยาย → Apps Script → <b>จดรหัสในบรรทัด TEACHER_KEY ไว้ก่อน</b> → ลบโค้ดเดิมทั้งหมด → วางโค้ดใหม่ → ใส่รหัสเดิมกลับใน TEACHER_KEY → กดบันทึก<br>' +
+      '<li><b>อัปเดตสคริปต์เป็นเวอร์ชัน 4 (ทำครั้งเดียว)</b><br>เปิดสเปรดชีต → ส่วนขยาย → Apps Script → <b>จดรหัสในบรรทัด TEACHER_KEY ไว้ก่อน</b> → ลบโค้ดเดิมทั้งหมด → วางโค้ดใหม่ → ใส่รหัสเดิมกลับใน TEACHER_KEY → กดบันทึก<br>' +
         'จากนั้นกด ทำให้ใช้งานได้ → <b>จัดการการทำให้ใช้งานได้</b> → กดรูปดินสอ → ช่องเวอร์ชันเลือก <b>เวอร์ชันใหม่</b> → กดทำให้ใช้งานได้ (ลิงก์เดิมใช้ต่อได้ ไม่ต้องแก้ config.js)' +
-        '<div style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" data-action="copy-script">คัดลอกสคริปต์เวอร์ชัน 3</button> <span id="copyMsg" class="msg ok" hidden>คัดลอกแล้ว</span></div>' +
+        '<div style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" data-action="copy-script">คัดลอกสคริปต์เวอร์ชัน 4</button> <span id="copyMsg" class="msg ok" hidden>คัดลอกแล้ว</span></div>' +
         '<pre class="code-box" id="scriptBox" hidden></pre></li>' +
       '<li>กดปุ่ม <b>โหลดข้อสอบใหม่</b> ด้านบนหนึ่งครั้ง สเปรดชีตจะมีแท็บใหม่ชื่อ <b>ข้อสอบ</b> พร้อมหัวตาราง</li>' +
       '<li>กรอกข้อสอบในแท็บ <b>ข้อสอบ</b> <b>1 แถว = 1 ข้อ</b><table class="plain" style="margin-top:8px"><tbody>' +
         '<tr><td><b>ชุดข้อสอบ</b></td><td>ชื่อชุด พิมพ์ให้เหมือนกันทุกแถวในชุดเดียวกัน (หรือพิมพ์แค่แถวแรก แถวถัดไปเว้นว่างได้)</td></tr>' +
-        '<tr><td><b>วิชา / เวลา(นาที)</b></td><td>ใส่แถวแรกของชุดก็พอ ถ้าไม่ใส่เวลา ระบบให้ 1.5 นาทีต่อข้อ</td></tr>' +
-        '<tr><td><b>หัวข้อ / ตัวชี้วัด / Bloom</b></td><td>ไม่บังคับ ใส่แล้วหน้าวิเคราะห์ข้อสอบจะแยกผลให้</td></tr>' +
+        '<tr><td><b>ข้อมูลของชุด</b><br>วิชา (รายวิชา), รหัสวิชา, ระดับชั้น, กลุ่มสาระ, สาระ, มาตรฐาน, หน่วยการเรียนรู้, เรื่อง, ประเภทการสอบ, ความยากของชุด, เวลา(นาที)</td>' +
+          '<td>ใส่แค่แถวแรกของชุดก็พอ ถ้าใส่ตัวชี้วัดรายข้อไว้ ระบบจะเติมระดับชั้น กลุ่มสาระ สาระ และมาตรฐานให้เอง ประเภทการสอบใช้คำว่า ก่อนเรียน ระหว่างเรียน หลังเรียน กลางภาค ปลายภาค หรือ ฝึกทำ</td></tr>' +
+        '<tr><td><b>หัวข้อ / ตัวชี้วัด / Bloom / ความยาก</b></td><td>รายข้อ ไม่บังคับ ความยากใช้คำว่า ง่าย ปานกลาง หรือ ยาก ใส่แล้วหน้าวิเคราะห์ข้อสอบจะแยกผลให้</td></tr>' +
         '<tr><td><b>คำถาม, ก, ข, ค, ง</b></td><td>จำเป็นต้องใส่ทั้งหมด</td></tr>' +
         '<tr><td><b>คำตอบ</b></td><td>พิมพ์ ก ข ค หรือ ง</td></tr>' +
         '<tr><td><b>คำอธิบาย</b></td><td>เหตุผลที่นักเรียนจะเห็นหลังตอบ</td></tr>' +
@@ -554,10 +707,14 @@
       '<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap">' +
       '<button type="button" class="btn btn-sm" data-action="close-bank">‹ กลับ</button>' +
       '<button type="button" class="btn btn-sm btn-primary" data-action="print">พิมพ์เฉลย</button></div>');
+    html += '<div class="paper-head card"><div class="tags">' + typePill(exam.examType) + diffPill(exam.difficulty, 'ความยาก ') +
+      '<span class="pill">' + exam.questions.length + ' ข้อ</span><span class="pill">' + (exam.timeLimitMinutes || 15) + ' นาที</span></div>' +
+      '<div class="meta wide">' + metaTable(exam, true).replace(/^<dl class="meta">|<\/dl>$/g, '') + '</div></div>';
+    html += blueprint(exam);
     html += '<div class="q-list">' + exam.questions.map(function (q, qi) {
       return '<div class="q-card card"><div class="q-head"><span class="pill pill-yellow">ข้อ ' + (qi + 1) + '</span>' +
         (q.indicator ? '<span class="pill">' + esc(q.indicator) + '</span>' : '') +
-        (q.bloom ? '<span class="pill pill-blue">' + esc(q.bloom) + '</span>' : '') + '</div>' +
+        (q.bloom ? '<span class="pill pill-blue">' + esc(q.bloom) + '</span>' : '') + diffPill(q.difficulty) + '</div>' +
         '<p class="q-text">' + esc(q.question) + '</p>' +
         (q.image ? '<img src="' + esc(q.image) + '" alt="' + esc(q.question) + '" style="max-width:100%;border:var(--border);border-radius:12px;margin-bottom:10px" />' : '') +
         '<ol>' + q.choices.map(function (c, ci) {
@@ -566,6 +723,43 @@
         (q.explanation ? '<p class="exp">' + esc(q.explanation) + '</p>' : '') + '</div>';
     }).join('') + '</div>';
     return html;
+  }
+
+  var BLOOM_ORDER = ['ความจำ', 'ความเข้าใจ', 'ประยุกต์ใช้', 'วิเคราะห์', 'ประเมินค่า', 'สร้างสรรค์'];
+
+  // ตารางวิเคราะห์ข้อสอบ: indicators × Bloom levels, plus difficulty counts.
+  function blueprint(exam) {
+    var blooms = [];
+    var rows = {};
+    var order = [];
+    var diff = { 'ง่าย': 0, 'ปานกลาง': 0, 'ยาก': 0 };
+    exam.questions.forEach(function (q, qi) {
+      var ind = q.indicator || 'ไม่ระบุตัวชี้วัด';
+      var b = q.bloom || 'ไม่ระบุ';
+      if (blooms.indexOf(b) < 0) blooms.push(b);
+      if (!rows[ind]) { rows[ind] = { total: 0, items: [] }; order.push(ind); }
+      rows[ind][b] = (rows[ind][b] || 0) + 1;
+      rows[ind].total++;
+      rows[ind].items.push(qi + 1);
+      if (diff[q.difficulty] != null) diff[q.difficulty]++;
+    });
+    blooms.sort(function (a, b) {
+      var ia = BLOOM_ORDER.indexOf(a); var ib = BLOOM_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    var rated = diff['ง่าย'] + diff['ปานกลาง'] + diff['ยาก'];
+    return '<div class="panel card block"><div class="block-head"><h2>ตารางวิเคราะห์ข้อสอบ</h2><span class="muted">ตัวชี้วัด × ระดับพฤติกรรม</span></div>' +
+      '<div class="table-wrap"><table class="plain"><thead><tr><th>ตัวชี้วัด</th>' +
+      blooms.map(function (b) { return '<th>' + esc(b) + '</th>'; }).join('') + '<th>รวม</th><th>ข้อที่</th></tr></thead><tbody>' +
+      order.map(function (ind) {
+        return '<tr><td>' + esc(ind) + '</td>' + blooms.map(function (b) { return '<td class="num">' + (rows[ind][b] || '-') + '</td>'; }).join('') +
+          '<td class="num"><b>' + rows[ind].total + '</b></td><td>' + rows[ind].items.join(', ') + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      (rated ? '<div class="tags" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">' +
+        ['ง่าย', 'ปานกลาง', 'ยาก'].map(function (d) { return diffPill(d, '') .replace('</span>', ' ' + diff[d] + ' ข้อ (' + pct(diff[d], exam.questions.length) + '%)</span>'); }).join('') +
+        (rated < exam.questions.length ? '<span class="pill">ไม่ระบุ ' + (exam.questions.length - rated) + ' ข้อ</span>' : '') + '</div>'
+        : '<p class="note">ยังไม่ได้ระบุความยากรายข้อ</p>') +
+      '</div>';
   }
 
   function questionKey(title, question) {
@@ -644,13 +838,16 @@
       else notes.push('<span class="pill pill-mint">ชุดใหม่</span>');
       if (e.clashesWithFile) notes.push('<span class="pill pill-peach">ชื่อซ้ำกับชุดในไฟล์เว็บ ควรเปลี่ยนชื่อ</span>');
       if (fresh < e.questions.length) notes.push('<span class="pill">ข้ามข้อที่มีอยู่แล้ว ' + (e.questions.length - fresh) + ' ข้อ</span>');
-      return '<details class="draft-exam"><summary><span class="draft-title"><b>' + esc(e.title) + '</b> • ' + fresh + ' ข้อใหม่' +
-        (e.subject ? ' • ' + esc(e.subject) : '') + (e.minutes ? ' • ' + e.minutes + ' นาที' : '') + '</span>' +
-        '<span class="draft-tags">' + notes.join('') + '</span></summary><div class="q-list" style="margin-top:12px">' +
+      return '<details class="draft-exam"' + (d.exams.length === 1 ? ' open' : '') + '><summary><span class="draft-title"><b>' + esc(e.title) + '</b> • ' + fresh + ' ข้อใหม่' +
+        (e.grade ? ' • ' + esc(e.grade) : '') + (e.minutes ? ' • ' + e.minutes + ' นาที' : '') + '</span>' +
+        '<span class="draft-tags">' + notes.join('') + '</span></summary>' +
+        '<div class="draft-meta">' + metaTable(e, true) + '</div>' +
+        '<div class="q-list" style="margin-top:12px">' +
         e.questions.map(function (q, qi) {
           return '<div class="q-card' + (q.duplicate ? ' is-dup' : '') + '"><div class="q-head"><span class="pill pill-yellow">ข้อ ' + (qi + 1) + '</span>' +
             (q.indicator ? '<span class="pill">' + esc(q.indicator) + '</span>' : '') +
             (q.bloom ? '<span class="pill pill-blue">' + esc(q.bloom) + '</span>' : '') +
+            diffPill(q.difficulty) +
             (q.duplicate ? '<span class="pill">มีอยู่แล้ว</span>' : '') + '</div>' +
             '<p class="q-text">' + esc(q.question) + '</p><ol>' + q.choices.map(function (c, ci) {
               return '<li' + (ci === q.answer ? ' class="is-answer"' : '') + '><b>' + LETTERS[ci] + '.</b><span>' + esc(c) + (ci === q.answer ? ' ✓' : '') + '</span></li>';
@@ -704,7 +901,10 @@
     if (!key) { state.importMsg = { kind: 'bad', text: 'ยังไม่ได้ใส่รหัสครูในเครื่องนี้ ไปที่ตั้งค่าแล้วกรอกรหัสครูก่อน' }; render(); return; }
 
     var exams = d.exams.map(function (e) {
-      return { title: e.title, subject: e.subject, minutes: e.minutes, questions: e.questions.filter(function (q) { return !q.duplicate; }) };
+      var copy = {};
+      Object.keys(e).forEach(function (k) { copy[k] = e[k]; });
+      copy.questions = e.questions.filter(function (q) { return !q.duplicate; });
+      return copy;
     }).filter(function (e) { return e.questions.length; });
     var expected = [];
     exams.forEach(function (e) { e.questions.forEach(function (q) { expected.push(questionKey(e.title, q.question)); }); });
@@ -720,10 +920,16 @@
       scrollToPreview();
     }
 
+    var version = state.sheet && state.sheet.scriptVersion;
+    if (version && version < 4) {
+      fail('สคริปต์ Google ยังเป็นเวอร์ชัน ' + version + ' ต้องอัปเดตเป็นเวอร์ชัน 4 ก่อน จึงจะบันทึกข้อมูลหลักสูตร (ระดับชั้น หน่วย ความยาก ฯลฯ) ได้ ดูวิธีที่ คลังข้อสอบ > วิธีเพิ่มข้อสอบ');
+      return;
+    }
+
     fetch(SHEETS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'importExams', key: key, rows: ExamImport.toRows(exams) })
+      body: JSON.stringify({ action: 'importExams', key: key, records: ExamImport.toRecords(exams) })
     }).then(function (res) {
       return res.json();
     }).then(function (reply) {
