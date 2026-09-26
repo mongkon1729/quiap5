@@ -1,114 +1,158 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="th" translate="no">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<title>ติวข้อสอบ ป.5</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="google" content="notranslate" />
+<title>ห้องติว ป.5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Chonburi&family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-<div id="app">
+<div class="student-app">
 
-  <div id="storageWarning" class="banner banner-warning" hidden>
-    ⚠ เบราว์เซอร์นี้บันทึกข้อมูลไม่ได้ (อาจเป็นโหมดส่วนตัว) ทำข้อสอบได้ตามปกติ แต่คะแนนจะไม่ถูกบันทึกไว้นะ
+  <header class="topbar">
+    <a class="brand" href="./">ห้องติว<span>.</span></a>
+    <div id="userChip" class="user-chip" hidden>
+      <span class="avatar" aria-hidden="true">★</span>
+      <span id="userChipName" class="name"></span>
+    </div>
+  </header>
+
+  <div id="storageWarning" class="banner" hidden>
+    เบราว์เซอร์นี้บันทึกข้อมูลไม่ได้ (อาจเป็นโหมดส่วนตัว) ทำข้อสอบได้ตามปกติ แต่คะแนนจะไม่ถูกบันทึกไว้ในเครื่องนะ
   </div>
 
-  <main id="mainArea">
-
+  <main>
     <!-- หน้าเริ่มต้น -->
     <section id="screen-start" class="screen">
-      <h1 class="page-title">เลือกชุดข้อสอบ</h1>
-      <p class="page-subtitle">สังคมศึกษา ป.5</p>
-      <div id="examList" class="exam-list" aria-live="polite"></div>
-      <div id="reviewEntry" class="review-entry" hidden>
-        <button id="btnGlobalReview" type="button" class="btn btn-secondary">
-          ทบทวนข้อที่เคยผิด (<span id="reviewCount">0</span> ข้อ)
-        </button>
+      <div class="hero card">
+        <div class="hero-text">
+          <h1 id="heroTitle">วันนี้ฝึกทำข้อสอบกันไหม</h1>
+          <p id="heroSub">เลือกชุดข้อสอบด้านล่างได้เลย ทำทีละข้อ มีเฉลยให้ทุกข้อ</p>
+        </div>
+        <div id="heroArt" class="hero-art"></div>
       </div>
+
+      <div class="section-head">
+        <h2>ชุดข้อสอบ</h2>
+        <span id="examCount" class="muted"></span>
+      </div>
+      <div id="examList" class="exam-grid" aria-live="polite"></div>
+
+      <div id="reviewEntry" class="review-card card" hidden>
+        <div class="review-text">
+          <strong>ข้อที่เคยตอบผิด <span id="reviewCount">0</span> ข้อ</strong>
+          <span>ลองทำอีกครั้ง ทำถูกแล้วจะหายจากรายการ</span>
+        </div>
+        <button id="btnGlobalReview" type="button" class="btn btn-sm">ทบทวนเลย</button>
+      </div>
+
+      <footer class="site-foot">
+        <a href="teacher.html">สำหรับคุณครู</a>
+      </footer>
     </section>
 
     <!-- หน้าระบุตัวตน -->
     <section id="screen-identify" class="screen" hidden>
-      <button type="button" id="btnBackToStart" class="btn-back">‹ กลับ</button>
-      <h1 class="page-title">ก่อนเริ่มทำข้อสอบ</h1>
-      <p id="identifyExamTitle" class="page-subtitle"></p>
+      <button type="button" id="btnBackToStart" class="back-link">‹ กลับไปเลือกชุด</button>
+      <div class="form-card card">
+        <h1>ก่อนเริ่มทำข้อสอบ</h1>
+        <p id="identifyExamTitle" class="sub"></p>
 
-      <form id="identifyForm" class="identify-form" novalidate>
-        <label for="inputName">ชื่อเล่น หรือ เลขที่</label>
-        <input id="inputName" name="name" type="text" required maxlength="30" autocomplete="off" placeholder="เช่น นัท หรือ เลขที่ 12" />
+        <form id="identifyForm" novalidate>
+          <div class="field">
+            <label for="inputName">เลขที่ และชื่อเล่น</label>
+            <input id="inputName" name="name" type="text" required maxlength="30" autocomplete="off" placeholder="เช่น 12 นัท" />
+            <span class="hint">ใช้แบบเดิมทุกครั้ง คะแนนจะได้ไม่ปนกับเพื่อน</span>
+          </div>
 
-        <label for="inputPin" id="labelPin">PIN 4 หลัก</label>
-        <input id="inputPin" name="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" required autocomplete="off" placeholder="••••" />
+          <div class="field">
+            <label for="inputPin" id="labelPin">PIN 4 หลัก</label>
+            <input id="inputPin" name="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" required autocomplete="off" placeholder="••••" />
+          </div>
 
-        <div id="pinConfirmWrap" hidden>
-          <label for="inputPinConfirm">ยืนยัน PIN อีกครั้ง</label>
-          <input id="inputPinConfirm" name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••" />
-        </div>
+          <div id="pinConfirmWrap" class="field" hidden>
+            <label for="inputPinConfirm">ยืนยัน PIN อีกครั้ง</label>
+            <input id="inputPinConfirm" name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••" />
+          </div>
 
-        <label class="switch-row" for="toggleTimer">
-          <span>โหมดจับเวลา</span>
-          <input id="toggleTimer" type="checkbox" />
-        </label>
+          <label class="switch-row" for="toggleTimer">
+            <span class="label-text">
+              <strong>โหมดจับเวลา</strong>
+              <span id="timerHint">นับถอยหลังทั้งชุด</span>
+            </span>
+            <span class="switch">
+              <input id="toggleTimer" type="checkbox" />
+              <span class="track"></span>
+            </span>
+          </label>
 
-        <p id="identifyError" class="error-text" hidden></p>
+          <p id="identifyError" class="error-text" hidden></p>
 
-        <button type="submit" class="btn btn-primary">เริ่มทำข้อสอบ</button>
-      </form>
+          <button type="submit" class="btn btn-primary" style="margin-top:14px">เริ่มทำข้อสอบ</button>
+        </form>
+      </div>
     </section>
 
     <!-- หน้าทำข้อสอบ -->
     <section id="screen-quiz" class="screen" hidden>
       <div class="quiz-top">
-        <div class="progress-info">
-          <span id="progressText">ข้อ 1 จาก 10</span>
-          <span id="timerText" class="timer-text" hidden></span>
+        <div class="quiz-top-row">
+          <span id="progressText" class="pill">ข้อ 1 จาก 10</span>
+          <span id="timerText" class="pill timer-pill" hidden></span>
         </div>
-        <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+        <div class="bar"><span id="progressFill"></span></div>
       </div>
 
-      <div class="question-card">
-        <p id="questionTopic" class="topic-tag"></p>
+      <div class="question-card card">
+        <span id="questionTopic" class="pill topic-tag"></span>
         <h2 id="questionText" class="question-text"></h2>
         <div id="questionImageWrap" class="question-image-wrap" hidden>
           <img id="questionImage" src="" alt="" />
           <p class="image-hint">แตะรูปเพื่อขยาย</p>
         </div>
         <div id="choicesList" class="choices-list"></div>
-        <p id="feedbackText" class="feedback-text" hidden></p>
-        <p id="explanationText" class="explanation-text" hidden></p>
+        <div id="feedbackBox" class="feedback" hidden>
+          <p id="feedbackText" class="feedback-text"></p>
+          <p id="explanationText" class="explanation-text"></p>
+        </div>
       </div>
 
       <div class="quiz-actions">
         <button id="btnCheck" type="button" class="btn btn-primary" disabled>ตรวจคำตอบ</button>
-        <button id="btnNext" type="button" class="btn btn-primary" hidden>ข้อต่อไป</button>
+        <button id="btnNext" type="button" class="btn btn-secondary" hidden>ข้อต่อไป</button>
       </div>
     </section>
 
     <!-- หน้าสรุปผล -->
     <section id="screen-summary" class="screen" hidden>
-      <h1 class="page-title" id="summaryHeading">สรุปผล</h1>
-      <div id="starsRow" class="stars-row" aria-hidden="true"></div>
-      <p id="summaryScore" class="summary-score"></p>
-      <p id="summaryMessage" class="summary-message"></p>
-      <div class="summary-actions">
-        <button id="btnReviewWrong" type="button" class="btn btn-secondary" hidden>ทบทวนข้อที่ผิด</button>
-        <button id="btnRetake" type="button" class="btn btn-primary">ทำใหม่</button>
-        <button id="btnToStart" type="button" class="btn btn-text">กลับหน้าแรก</button>
+      <div class="summary-card card">
+        <div id="starsRow" class="stars-row" aria-hidden="true"></div>
+        <h1 id="summaryHeading">สรุปผล</h1>
+        <p id="summaryScore" class="summary-score"></p>
+        <p id="summaryMessage" class="summary-message"></p>
+        <div class="summary-actions">
+          <button id="btnRetake" type="button" class="btn btn-primary">ทำใหม่</button>
+          <button id="btnReviewWrong" type="button" class="btn btn-secondary" hidden>ทบทวนข้อที่ผิด</button>
+          <button id="btnToStart" type="button" class="btn btn-ghost">กลับหน้าแรก</button>
+        </div>
       </div>
     </section>
 
     <!-- หน้าเสร็จสิ้นการทบทวน -->
     <section id="screen-review-done" class="screen" hidden>
-      <h1 class="page-title">เก่งมาก!</h1>
-      <p id="reviewDoneText" class="summary-message"></p>
-      <div class="summary-actions">
-        <button id="btnReviewDoneToStart" type="button" class="btn btn-primary">กลับหน้าแรก</button>
+      <div class="summary-card card">
+        <div class="stars-row" aria-hidden="true"><span class="star on">✓</span></div>
+        <h1>ทบทวนเสร็จแล้ว</h1>
+        <p id="reviewDoneText" class="summary-message"></p>
+        <div class="summary-actions">
+          <button id="btnReviewDoneToStart" type="button" class="btn btn-primary">กลับหน้าแรก</button>
+        </div>
       </div>
     </section>
-
   </main>
 
   <div id="imageModal" class="image-modal" hidden>
@@ -117,7 +161,10 @@
 
 </div>
 
+<script src="js/config.js"></script>
+<script src="js/art.js"></script>
 <script src="js/storage.js"></script>
+<script src="js/sync.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

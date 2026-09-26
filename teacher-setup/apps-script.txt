@@ -1,0 +1,78 @@
+// ===== ห้องติว ป.5 : สคริปต์รับคะแนน =====
+// 1) เปลี่ยนรหัสด้านล่างเป็นรหัสลับของครูเอง (ใช้เปิดหน้าครู) ห้ามบอกนักเรียน
+var TEACHER_KEY = 'เปลี่ยนเป็นรหัสลับของครู';
+
+var SHEET_NAME = 'results';
+var HEADERS = ['timestamp', 'student', 'examId', 'examTitle', 'score', 'answered',
+  'questionCount', 'completed', 'wrongIds', 'durationSec', 'clientId'];
+
+function getSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(HEADERS);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function clip_(value, max) {
+  return String(value == null ? '' : value).slice(0, max);
+}
+
+function num_(value) {
+  var n = Number(value);
+  return isFinite(n) ? n : 0;
+}
+
+function json_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sheet = getSheet_();
+    var clientId = clip_(data.clientId, 40);
+    var last = sheet.getLastRow();
+    if (clientId && last > 1) {
+      var ids = sheet.getRange(2, HEADERS.length, last - 1, 1).getValues();
+      for (var i = 0; i < ids.length; i++) {
+        if (ids[i][0] === clientId) return json_({ ok: true, duplicate: true });
+      }
+    }
+    sheet.appendRow([
+      new Date(data.timestamp || Date.now()),
+      clip_(data.student, 40),
+      clip_(data.examId, 60),
+      clip_(data.examTitle, 120),
+      num_(data.score),
+      num_(data.answered),
+      num_(data.questionCount),
+      data.completed === true,
+      clip_(data.wrongIds, 500),
+      num_(data.durationSec),
+      clientId
+    ]);
+  } finally {
+    lock.releaseLock();
+  }
+  return json_({ ok: true });
+}
+
+function doGet(e) {
+  if (!e.parameter.key || e.parameter.key !== TEACHER_KEY) {
+    return json_({ ok: false, error: 'unauthorized' });
+  }
+  var values = getSheet_().getDataRange().getValues();
+  var rows = [];
+  for (var r = 1; r < values.length; r++) {
+    var row = {};
+    for (var c = 0; c < HEADERS.length; c++) row[HEADERS[c]] = values[r][c];
+    rows.push(row);
+  }
+  return json_({ ok: true, rows: rows });
+}

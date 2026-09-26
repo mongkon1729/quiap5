@@ -15,15 +15,24 @@
     timerInterval: null,
     secondsLeft: 0,
     answeredCurrent: false,
+    startedAt: 0,
     currentChoiceOrder: [] // maps displayed choice position -> original choice index
   };
+
+  var LETTERS = ['ก', 'ข', 'ค', 'ง'];
 
   var el = {};
 
   function cacheEls() {
     el.storageWarning = document.getElementById('storageWarning');
+    el.userChip = document.getElementById('userChip');
+    el.userChipName = document.getElementById('userChipName');
 
     el.screenStart = document.getElementById('screen-start');
+    el.heroTitle = document.getElementById('heroTitle');
+    el.heroSub = document.getElementById('heroSub');
+    el.heroArt = document.getElementById('heroArt');
+    el.examCount = document.getElementById('examCount');
     el.examList = document.getElementById('examList');
     el.reviewEntry = document.getElementById('reviewEntry');
     el.btnGlobalReview = document.getElementById('btnGlobalReview');
@@ -38,6 +47,7 @@
     el.pinConfirmWrap = document.getElementById('pinConfirmWrap');
     el.inputPinConfirm = document.getElementById('inputPinConfirm');
     el.toggleTimer = document.getElementById('toggleTimer');
+    el.timerHint = document.getElementById('timerHint');
     el.identifyError = document.getElementById('identifyError');
     el.btnBackToStart = document.getElementById('btnBackToStart');
 
@@ -50,6 +60,7 @@
     el.questionImageWrap = document.getElementById('questionImageWrap');
     el.questionImage = document.getElementById('questionImage');
     el.choicesList = document.getElementById('choicesList');
+    el.feedbackBox = document.getElementById('feedbackBox');
     el.feedbackText = document.getElementById('feedbackText');
     el.explanationText = document.getElementById('explanationText');
     el.btnCheck = document.getElementById('btnCheck');
@@ -102,17 +113,39 @@
 
   // ---------- หน้าเริ่มต้น ----------
 
+  function renderUserChip() {
+    el.userChip.hidden = !state.currentUserName;
+    el.userChipName.textContent = state.currentUserName || '';
+    if (state.currentUserName) {
+      el.heroTitle.textContent = 'สวัสดี ' + state.currentUserName;
+      el.heroSub.textContent = 'ทำได้ดีมาก ฝึกต่ออีกสักชุดไหม';
+    }
+  }
+
   function renderStartScreen() {
+    renderUserChip();
+    el.examCount.textContent = examsData.exams.length + ' ชุด';
     el.examList.innerHTML = '';
-    examsData.exams.forEach(function (exam) {
+    examsData.exams.forEach(function (exam, i) {
       var best = state.currentUserName ? Storage.getBestScore(state.currentUserName, exam.id) : null;
-      var card = document.createElement('div');
-      card.className = 'exam-card';
+      var pct = best ? Math.round((best.score / best.total) * 100) : 0;
+      var card = document.createElement('article');
+      card.className = 'exam-card card';
+      card.style.animationDelay = (i * 70) + 'ms';
       card.innerHTML =
-        '<h3>' + escapeHtml(exam.title) + '</h3>' +
-        '<p class="exam-meta">' + escapeHtml(exam.subject) + ' • ' + exam.questions.length + ' ข้อ</p>' +
-        '<p class="exam-best">' + (best ? ('คะแนนสูงสุด: ' + best.score + '/' + best.total) : 'ยังไม่เคยทำ') + '</p>' +
-        '<button type="button" class="btn btn-primary btn-start-exam">เริ่มทำข้อสอบ</button>';
+        '<div class="cover">' + Art.cover(i) +
+          '<span class="pill">' + exam.questions.length + ' ข้อ</span>' +
+        '</div>' +
+        '<div class="exam-card-body">' +
+          '<h3>' + escapeHtml(exam.title) + '</h3>' +
+          '<div class="exam-meta"><span>' + escapeHtml(exam.subject) + '</span>' +
+          '<span>จับเวลา ' + (exam.timeLimitMinutes || 15) + ' นาที</span></div>' +
+          (best
+            ? '<div class="best-row"><span>คะแนนสูงสุด</span><strong>' + best.score + '/' + best.total + '</strong></div>' +
+              '<div class="bar"><span style="width:' + pct + '%"></span></div>'
+            : '<div class="best-row"><span>' + (state.currentUserName ? 'ยังไม่เคยทำชุดนี้' : 'เข้าชื่อแล้วจะเห็นคะแนนสูงสุด') + '</span></div>') +
+          '<button type="button" class="btn btn-primary btn-start-exam">เริ่มทำข้อสอบ</button>' +
+        '</div>';
       card.querySelector('.btn-start-exam').addEventListener('click', function () {
         openIdentifyScreen(exam);
       });
@@ -138,7 +171,8 @@
 
   function openIdentifyScreen(exam) {
     state.selectedExam = exam;
-    el.identifyExamTitle.textContent = exam.title;
+    el.identifyExamTitle.textContent = exam.title + ' • ' + exam.questions.length + ' ข้อ';
+    el.timerHint.textContent = 'นับถอยหลังทั้งชุด ' + (exam.timeLimitMinutes || 15) + ' นาที';
     el.identifyForm.reset();
     el.identifyError.hidden = true;
     el.pinConfirmWrap.hidden = true;
@@ -180,7 +214,7 @@
     var pin = el.inputPin.value.trim();
 
     if (!name) {
-      showIdentifyError('กรอกชื่อเล่นหรือเลขที่ก่อนนะ');
+      showIdentifyError('กรอกเลขที่และชื่อเล่นก่อนนะ');
       return;
     }
     if (!/^[0-9]{4}$/.test(pin)) {
@@ -203,8 +237,9 @@
       return;
     }
 
-    state.currentUserName = name;
+    state.currentUserName = result.profile.displayName;
     state.timerEnabled = el.toggleTimer.checked;
+    renderUserChip();
     startQuiz(state.selectedExam);
   }
 
@@ -215,6 +250,7 @@
     state.questions = exam.questions;
     state.currentIndex = 0;
     state.answers = [];
+    state.startedAt = Date.now();
     renderQuestion();
     showScreen(el.screenQuiz);
     setupTimerIfNeeded(exam);
@@ -243,7 +279,7 @@
   function updateTimerDisplay() {
     var m = Math.floor(state.secondsLeft / 60);
     var s = state.secondsLeft % 60;
-    el.timerText.textContent = '⏱ ' + m + ':' + (s < 10 ? '0' : '') + s;
+    el.timerText.textContent = 'เหลือ ' + m + ':' + (s < 10 ? '0' : '') + s;
   }
 
   function shuffleArray(arr) {
@@ -286,21 +322,19 @@
     state.currentChoiceOrder = order;
 
     el.choicesList.innerHTML = '';
-    var letters = ['ก', 'ข', 'ค', 'ง'];
     order.forEach(function (originalIdx, displayIdx) {
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'choice-btn';
       btn.dataset.originalIndex = originalIdx;
-      btn.innerHTML = '<span class="choice-icon">' + letters[displayIdx] + '</span><span class="choice-label"></span>';
+      btn.innerHTML = '<span class="choice-icon">' + LETTERS[displayIdx] + '</span><span class="choice-label"></span>';
       btn.querySelector('.choice-label').textContent = question.choices[originalIdx];
       btn.addEventListener('click', function () { selectChoice(btn); });
       el.choicesList.appendChild(btn);
     });
 
-    el.feedbackText.hidden = true;
-    el.feedbackText.className = 'feedback-text';
-    el.explanationText.hidden = true;
+    el.feedbackBox.hidden = true;
+    el.feedbackBox.className = 'feedback';
     el.btnCheck.hidden = false;
     el.btnCheck.disabled = true;
     el.btnNext.hidden = true;
@@ -332,21 +366,22 @@
       var idx = parseInt(b.dataset.originalIndex, 10);
       if (idx === question.answer) {
         b.classList.add('correct');
+        b.querySelector('.choice-icon').textContent = '✓';
       } else if (b === selectedBtn) {
         b.classList.add('wrong');
+        b.querySelector('.choice-icon').textContent = '✕';
       }
     });
 
-    el.feedbackText.hidden = false;
-    el.explanationText.hidden = false;
+    el.feedbackBox.hidden = false;
     el.explanationText.textContent = question.explanation || '';
 
     if (isCorrect) {
       el.feedbackText.textContent = '✓ ถูกต้อง เก่งมาก!';
-      el.feedbackText.classList.add('is-correct');
+      el.feedbackBox.classList.add('is-correct');
     } else {
       el.feedbackText.textContent = '✕ ยังไม่ถูกนะ ลองอ่านเหตุผลดูนะ';
-      el.feedbackText.classList.add('is-wrong');
+      el.feedbackBox.classList.add('is-wrong');
     }
 
     if (state.mode === 'normal') {
@@ -397,6 +432,21 @@
       Storage.saveBestScore(state.currentUserName, state.selectedExam.id, score, fullTotal);
     }
 
+    if (attempted > 0 && state.currentUserName) {
+      ResultSync.submit({
+        timestamp: new Date().toISOString(),
+        student: state.currentUserName,
+        examId: state.selectedExam.id,
+        examTitle: state.selectedExam.title,
+        score: score,
+        answered: attempted,
+        questionCount: fullTotal,
+        completed: attempted === fullTotal,
+        wrongIds: state.answers.filter(function (a) { return !a.correct; }).map(function (a) { return a.questionId; }).join(','),
+        durationSec: Math.round((Date.now() - state.startedAt) / 1000)
+      });
+    }
+
     renderSummary(score, attempted);
     showScreen(el.screenSummary);
   }
@@ -413,9 +463,11 @@
       message = 'ไม่เป็นไรนะ ลองทบทวนแล้วมาทำใหม่กันนะ';
     }
 
-    el.summaryHeading.textContent = 'สรุปผล';
-    el.starsRow.textContent = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
-    el.summaryScore.textContent = 'ได้ ' + score + ' จาก ' + total + ' ข้อ';
+    el.summaryHeading.textContent = state.selectedExam.title;
+    el.starsRow.innerHTML = [0, 1, 2].map(function (i) {
+      return '<span class="star' + (i < stars ? ' on' : '') + '">★</span>';
+    }).join('');
+    el.summaryScore.textContent = score + ' / ' + total;
     el.summaryMessage.textContent = message;
 
     var wrongCount = state.currentUserName ? Storage.getWrongQuestions(state.currentUserName).length : 0;
@@ -498,6 +550,8 @@
     if (!Storage.isAvailable()) {
       el.storageWarning.hidden = false;
     }
+    el.heroArt.innerHTML = Art.hero();
+    ResultSync.flush();
 
     fetch('data/questions.json')
       .then(function (res) { return res.json(); })
@@ -506,7 +560,7 @@
         renderStartScreen();
       })
       .catch(function () {
-        el.examList.innerHTML = '<p>ไม่สามารถโหลดข้อสอบได้ ลองเปิดหน้านี้ผ่านเซิร์ฟเวอร์ท้องถิ่นอีกครั้งนะ</p>';
+        el.examList.innerHTML = '<p class="empty-note">โหลดข้อสอบไม่ได้ ลองเช็กอินเทอร์เน็ตแล้วรีเฟรชหน้านี้อีกครั้งนะ</p>';
       });
   }
 
