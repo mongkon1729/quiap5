@@ -303,6 +303,28 @@ table.plain td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .item-table tr.flag td { background: var(--wrong-bg); }
 .item-table .muted { color: var(--ink-soft); }
 
+.bp-ind { min-width: 220px; }
+.bp-ind .muted { font-size: 13px; color: var(--ink-soft); }
+
+/* curriculum picker */
+.picker { margin-top: 12px; border: var(--border); border-radius: var(--radius-sm); padding: 10px 14px; background: var(--paper-2); }
+.picker summary { cursor: pointer; font-weight: 700; min-height: 36px; display: flex; align-items: center; }
+.pick-fields { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 12px 0; }
+@media (min-width: 600px) { .pick-fields { grid-template-columns: 1fr 1fr; } }
+.pick-field { display: flex; flex-direction: column; gap: 4px; font-size: 14px; font-weight: 600; }
+.pick-field input, .pick-field select {
+  min-height: 44px; padding: 6px 12px; border: var(--border); border-radius: 10px;
+  background: var(--paper); color: var(--ink); font-family: inherit; font-size: 15px;
+}
+.pick-list { max-height: 420px; overflow-y: auto; padding-right: 6px; }
+.pick-strand { font-size: 15px; margin: 14px 0 6px; }
+.pick-std { margin-bottom: 10px; padding: 10px 12px; border-radius: 10px; background: var(--paper); border: 1px dashed var(--ink-soft); }
+.pick-std > p { margin: 0 0 6px; font-size: 13px; color: var(--ink-soft); }
+.pick-std > p b { color: var(--ink); }
+.pick-item { display: flex; gap: 10px; align-items: flex-start; padding: 6px 4px; font-size: 14px; line-height: 1.5; cursor: pointer; border-radius: 8px; }
+.pick-item:hover { background: var(--accent-soft); }
+.pick-item input { width: 20px; height: 20px; margin-top: 2px; flex-shrink: 0; accent-color: var(--accent); }
+
 /* import */
 .import-steps { display: grid; grid-template-columns: 1fr; gap: 18px; margin-bottom: 26px; }
 @media (min-width: 1100px) { .import-steps { grid-template-columns: 1fr 1fr; align-items: start; } }

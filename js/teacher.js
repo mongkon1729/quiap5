@@ -40,6 +40,7 @@
     sheet: null,
     draft: null,
     importMsg: null,
+    pick: { codes: {}, title: '', subject: '', courseCode: '', unit: '', lesson: '', examType: '', count: '10' },
     importing: false,
     studentQuery: '',
     scriptText: null,
@@ -77,6 +78,70 @@
     var h = 0;
     for (var i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0;
     return Art.color(Math.abs(h));
+  }
+
+  // ---------- curriculum (data/curriculum.json) ----------
+
+  var curriculum = { list: [], byCode: {}, source: '', note: '' };
+
+  function arabicDigits(s) {
+    return String(s || '').replace(/[๐-๙]/g, function (d) { return String(d.charCodeAt(0) - 0x0E50); });
+  }
+
+  // "ส3.1 ป.5/2" / "ส ๓.๑ ป.๕/๒" -> "ส 3.1 ป.5/2"
+  function normCode(code) {
+    var m = arabicDigits(code).match(/([ทควสพศงอ])\s*(\d+)\.(\d+)\s*(ป|ม)\.\s*(\d)\s*\/\s*(\d+)/);
+    return m ? m[1] + ' ' + m[2] + '.' + m[3] + ' ' + m[4] + '.' + m[5] + '/' + m[6] : '';
+  }
+
+  function loadCurriculum() {
+    return fetch('data/curriculum.json').then(function (r) { return r.json(); }).then(function (data) {
+      curriculum.source = data.source || '';
+      curriculum.note = data.note || '';
+      Object.keys(data.areas || {}).forEach(function (letter) {
+        var area = data.areas[letter];
+        area.strands.forEach(function (strand) {
+          strand.standards.forEach(function (st) {
+            Object.keys(st.indicators || {}).forEach(function (grade) {
+              st.indicators[grade].forEach(function (text, i) {
+                var code = st.code + ' ' + grade + '/' + (i + 1);
+                var item = {
+                  code: code, text: text, grade: grade, standard: st.code, standardText: st.text,
+                  strand: 'สาระที่ ' + strand.no + ' ' + strand.name, area: area.name, letter: letter, strandNo: strand.no
+                };
+                curriculum.byCode[code] = item;
+                curriculum.list.push(item);
+              });
+            });
+          });
+        });
+      });
+    }).catch(function () { /* curriculum is optional reference data */ });
+  }
+
+  function indicatorInfo(code) {
+    return curriculum.byCode[normCode(code)] || null;
+  }
+
+  // Codes we can check: same area/grade/strand as something in the curriculum file.
+  function isCheckable(code) {
+    var n = normCode(code);
+    if (!n) return false;
+    var parts = n.split(' ');
+    return curriculum.list.some(function (it) {
+      return it.letter === parts[0] && it.grade === parts[2].split('/')[0] && it.standard.split('.')[0] === parts[0] + ' ' + parts[1].split('.')[0];
+    });
+  }
+
+  function unknownIndicators(questions) {
+    var bad = [];
+    questions.forEach(function (q) {
+      String(q.indicator || '').split(/[,،]/).forEach(function (raw) {
+        var c = raw.trim();
+        if (c && isCheckable(c) && !indicatorInfo(c) && bad.indexOf(c) < 0) bad.push(c);
+      });
+    });
+    return bad;
   }
 
   function diffPill(d, prefix) {
@@ -490,7 +555,7 @@
       '<div class="table-wrap"><table class="plain item-table"><thead><tr><th>ข้อ</th><th>ตัวชี้วัด / Bloom</th><th>ความยากที่กำหนด</th><th>p</th><th>แปลผล p</th><th>r</th><th>แปลผล r</th><th>ข้อสังเกต</th></tr></thead><tbody>' +
       stats.map(function (it) {
         return '<tr' + (it.flags.length ? ' class="flag"' : '') + '><td class="num"><b>' + it.no + '</b></td>' +
-          '<td>' + esc(it.q.indicator || '-') + (it.q.bloom ? '<br><span class="muted">' + esc(it.q.bloom) + '</span>' : '') + '</td>' +
+          '<td title="' + esc((indicatorInfo(it.q.indicator) || {}).text || '') + '">' + esc(it.q.indicator || '-') + (it.q.bloom ? '<br><span class="muted">' + esc(it.q.bloom) + '</span>' : '') + '</td>' +
           '<td>' + (it.q.difficulty ? diffPill(it.q.difficulty) : '<span class="muted">-</span>') + '</td>' +
           '<td class="num">' + it.p.toFixed(2) + '</td><td>' + it.pLabel + '</td>' +
           '<td class="num">' + (it.r == null ? '-' : it.r.toFixed(2)) + '</td><td>' + (it.rLabel || '<span class="muted">ข้อมูลยังน้อย</span>') + '</td>' +
@@ -752,7 +817,9 @@
       '<div class="table-wrap"><table class="plain"><thead><tr><th>ตัวชี้วัด</th>' +
       blooms.map(function (b) { return '<th>' + esc(b) + '</th>'; }).join('') + '<th>รวม</th><th>ข้อที่</th></tr></thead><tbody>' +
       order.map(function (ind) {
-        return '<tr><td>' + esc(ind) + '</td>' + blooms.map(function (b) { return '<td class="num">' + (rows[ind][b] || '-') + '</td>'; }).join('') +
+        var info = indicatorInfo(ind);
+        return '<tr><td class="bp-ind"><b>' + esc(ind) + '</b>' + (info ? '<br><span class="muted">' + esc(info.text) + '</span>' : '') + '</td>' +
+          blooms.map(function (b) { return '<td class="num">' + (rows[ind][b] || '-') + '</td>'; }).join('') +
           '<td class="num"><b>' + rows[ind].total + '</b></td><td>' + rows[ind].items.join(', ') + '</td></tr>';
       }).join('') + '</tbody></table></div>' +
       (rated ? '<div class="tags" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">' +
@@ -800,11 +867,13 @@
 
     html += '<div class="import-steps">' +
       '<div class="panel card"><div class="step-no">1</div><h2>ให้ AI ออกข้อสอบ</h2>' +
-        '<p class="note" style="margin-top:0">คัดลอกคำสั่งไปวางใน ChatGPT, Gemini หรือ Claude แก้ส่วนที่อยู่ใน [ ] เป็นวิชา เรื่อง และจำนวนข้อที่ต้องการ</p>' +
-        '<div class="btn-row"><button type="button" class="btn btn-primary btn-sm" data-action="copy-prompt">คัดลอกคำสั่งสำหรับ AI</button>' +
+        (curriculum.list.length
+          ? '<p class="note" style="margin-top:0">เลือกตัวชี้วัดจากหลักสูตรด้านล่าง ระบบจะใส่ข้อความตัวชี้วัดตามหลักสูตรลงในคำสั่งให้ แล้วคัดลอกไปวางใน ChatGPT, Gemini หรือ Claude</p>'
+          : '<p class="note" style="margin-top:0">คัดลอกคำสั่งไปวางใน ChatGPT, Gemini หรือ Claude แก้ส่วนที่อยู่ใน [ ] เป็นวิชา เรื่อง และจำนวนข้อที่ต้องการ</p>') +
+        indicatorPicker() +
+        '<div class="btn-row" style="margin-top:14px"><button type="button" class="btn btn-primary btn-sm" data-action="copy-prompt" id="promptBtn">' + promptButtonLabel() + '</button>' +
         '<button type="button" class="btn btn-sm" data-action="download-example">ไฟล์ตัวอย่าง .txt</button></div>' +
-        '<p id="promptMsg" class="msg ok" hidden>คัดลอกแล้ว นำไปวางในแชต AI ได้เลย</p>' +
-        '<details class="peek"><summary>ดูคำสั่งที่จะคัดลอก</summary><pre class="code-box">' + esc(ExamImport.aiPrompt) + '</pre></details></div>' +
+        '<p id="promptMsg" class="msg ok" hidden>คัดลอกแล้ว นำไปวางในแชต AI ได้เลย</p></div>' +
       '<div class="panel card"><div class="step-no">2</div><h2>เลือกไฟล์ หรือวางข้อความ</h2>' +
         '<label id="dropZone" class="dropzone" for="importFile"><strong>ลากไฟล์มาวางตรงนี้ หรือกดเพื่อเลือกไฟล์</strong>' +
         '<span>รับไฟล์ .txt .csv .json (บันทึกคำตอบของ AI เป็นไฟล์ .txt ได้เลย)</span></label>' +
@@ -823,6 +892,76 @@
     return html;
   }
 
+  function pickedCodes() {
+    return Object.keys(state.pick.codes).filter(function (c) { return state.pick.codes[c]; });
+  }
+
+  function promptButtonLabel() {
+    var n = pickedCodes().length;
+    return n ? 'คัดลอกคำสั่งสำหรับ AI (ตัวชี้วัด ' + n + ' ตัว)' : 'คัดลอกคำสั่งสำหรับ AI';
+  }
+
+  function indicatorPicker() {
+    if (!curriculum.list.length) return '';
+    var p = state.pick;
+    function field(key, label, placeholder, type) {
+      return '<label class="pick-field"><span>' + label + '</span><input data-pick="' + key + '" type="' + (type || 'text') + '" value="' + esc(p[key]) + '" placeholder="' + esc(placeholder || '') + '" /></label>';
+    }
+    var types = ExamSource.EXAM_TYPES.map(function (t) { return '<option' + (p.examType === t ? ' selected' : '') + '>' + t + '</option>'; }).join('');
+    var groups = {};
+    var order = [];
+    curriculum.list.forEach(function (it) {
+      var key = it.grade + '|' + it.standard;
+      if (!groups[key]) { groups[key] = { head: it, items: [] }; order.push(key); }
+      groups[key].items.push(it);
+    });
+    var lastStrand = '';
+    return '<details class="picker"' + (pickedCodes().length ? ' open' : '') + '><summary>เลือกตัวชี้วัดจากหลักสูตร (' + esc(curriculum.list[0].area) + ' ' + esc(curriculum.list[0].grade) + ')</summary>' +
+      '<div class="pick-fields">' +
+        field('title', 'ชื่อชุด', 'เช่น เศรษฐกิจน่ารู้ หลังเรียน') +
+        field('subject', 'รายวิชา', 'เช่น สังคมศึกษา 5') +
+        field('courseCode', 'รหัสวิชา', 'เช่น ส15101') +
+        field('unit', 'หน่วยการเรียนรู้', 'เช่น หน่วยที่ 3 เศรษฐกิจน่ารู้') +
+        field('lesson', 'เรื่อง', 'เช่น ปัจจัยการผลิต') +
+        '<label class="pick-field"><span>ประเภทการสอบ</span><select data-pick="examType"><option value="">เลือก</option>' + types + '</select></label>' +
+        field('count', 'จำนวนข้อ', '10', 'number') +
+      '</div>' +
+      '<div class="pick-list">' + order.map(function (key) {
+        var g = groups[key];
+        var strandHead = g.head.strand !== lastStrand ? '<h3 class="pick-strand">' + esc(g.head.strand) + '</h3>' : '';
+        lastStrand = g.head.strand;
+        return strandHead + '<div class="pick-std"><p><b>มาตรฐาน ' + esc(g.head.standard) + '</b> ' + esc(g.head.standardText) + '</p>' +
+          g.items.map(function (it) {
+            return '<label class="pick-item"><input type="checkbox" data-code="' + esc(it.code) + '"' + (p.codes[it.code] ? ' checked' : '') + ' />' +
+              '<span><b>' + esc(it.grade + '/' + it.code.split('/')[1]) + '</b> ' + esc(it.text) + '</span></label>';
+          }).join('') + '</div>';
+      }).join('') + '</div>' +
+      '<p class="note">ที่มา: ' + esc(curriculum.source) + (curriculum.note ? ' • ' + esc(curriculum.note) : '') + '</p></details>';
+  }
+
+  function buildPickedPrompt() {
+    var codes = pickedCodes();
+    if (!codes.length) return ExamImport.aiPrompt;
+    var items = codes.map(function (c) { return curriculum.byCode[c]; }).filter(Boolean);
+    items.sort(function (a, b) { return curriculum.list.indexOf(a) - curriculum.list.indexOf(b); });
+    function uniq(list) { return list.filter(function (v, i) { return v && list.indexOf(v) === i; }); }
+    var p = state.pick;
+    return ExamImport.promptFor({
+      title: p.title,
+      grade: items[0].grade,
+      area: items[0].area,
+      subject: p.subject,
+      courseCode: p.courseCode,
+      strands: uniq(items.map(function (it) { return it.strand; })),
+      standards: uniq(items.map(function (it) { return it.standard; })),
+      unit: p.unit,
+      lesson: p.lesson,
+      examType: p.examType,
+      count: p.count,
+      indicators: items
+    });
+  }
+
   function draftPreview(d) {
     var html = '<div class="panel card block draft-panel"><div class="step-no">3</div><h2>ตรวจก่อนเพิ่มเข้าเว็บ</h2>' +
       '<p class="note" style="margin-top:0">จาก ' + esc(d.filename) + '</p>';
@@ -838,6 +977,8 @@
       else notes.push('<span class="pill pill-mint">ชุดใหม่</span>');
       if (e.clashesWithFile) notes.push('<span class="pill pill-peach">ชื่อซ้ำกับชุดในไฟล์เว็บ ควรเปลี่ยนชื่อ</span>');
       if (fresh < e.questions.length) notes.push('<span class="pill">ข้ามข้อที่มีอยู่แล้ว ' + (e.questions.length - fresh) + ' ข้อ</span>');
+      var bad = unknownIndicators(e.questions);
+      if (bad.length) notes.push('<span class="pill pill-peach">ตัวชี้วัดไม่พบในหลักสูตร: ' + esc(bad.join(', ')) + '</span>');
       return '<details class="draft-exam"' + (d.exams.length === 1 ? ' open' : '') + '><summary><span class="draft-title"><b>' + esc(e.title) + '</b> • ' + fresh + ' ข้อใหม่' +
         (e.grade ? ' • ' + esc(e.grade) : '') + (e.minutes ? ' • ' + e.minutes + ' นาที' : '') + '</span>' +
         '<span class="draft-tags">' + notes.join('') + '</span></summary>' +
@@ -1152,7 +1293,7 @@
     else if (a === 'copy-script') copyScript();
     else if (a === 'copy-header') copyText(EXAM_HEADERS.join('\t'), 'headerMsg');
     else if (a === 'reload-exams') reloadExams();
-    else if (a === 'copy-prompt') copyText(ExamImport.aiPrompt, 'promptMsg');
+    else if (a === 'copy-prompt') copyText(buildPickedPrompt(), 'promptMsg');
     else if (a === 'download-example') downloadExample();
     else if (a === 'parse-import') {
       var text = $('importText').value;
@@ -1168,6 +1309,10 @@
   }
 
   function onInput(e) {
+    if (e.target.dataset && e.target.dataset.pick) {
+      state.pick[e.target.dataset.pick] = e.target.value;
+      return;
+    }
     if (e.target.id !== 'studentSearch') return;
     state.studentQuery = e.target.value;
     var pos = e.target.selectionStart;
@@ -1246,6 +1391,15 @@
     document.addEventListener('submit', onSubmit);
     document.addEventListener('change', function (e) {
       if (e.target.id === 'importFile') readImportFile(e.target.files[0]);
+      if (e.target.dataset.pick) state.pick[e.target.dataset.pick] = e.target.value;
+      if (e.target.dataset.code) {
+        state.pick.codes[e.target.dataset.code] = e.target.checked;
+        var btn = $('promptBtn');
+        if (btn) btn.textContent = promptButtonLabel();
+      }
+    });
+    loadCurriculum().then(function () {
+      if (!$('dashShell').hidden) render();
     });
     bindLock();
 
