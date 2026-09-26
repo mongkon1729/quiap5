@@ -352,7 +352,7 @@ button { font-family: inherit; }
   color: var(--ink-soft);
   font-size: 16px;
   padding: 8px 0;
-  min-height: 44px;
+  min-height: 48px;
   cursor: pointer;
 }
 .back-link:hover { color: var(--ink); }
@@ -466,7 +466,7 @@ button { font-family: inherit; }
   width: 100%;
   text-align: left;
   padding: 10px 14px;
-  font-size: 17px;
+  font-size: 18px;
   line-height: 1.45;
   border: var(--border);
   border-radius: var(--radius-sm);
@@ -640,3 +640,25 @@ button { font-family: inherit; }
   border-radius: var(--radius-sm);
   background: #fff;
 }
+
+/* confirm modal */
+.confirm-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 18, 28, .78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 110;
+  animation: rise .2s var(--ease);
+}
+.confirm-card {
+  max-width: 360px;
+  width: 100%;
+  padding: 24px 20px 20px;
+  text-align: center;
+}
+.confirm-text { font-size: 18px; font-weight: 700; line-height: 1.5; margin: 0 0 18px; }
+.confirm-actions { display: flex; gap: 10px; }
+.confirm-actions .btn { width: auto; flex: 1; }

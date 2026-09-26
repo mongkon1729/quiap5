@@ -95,6 +95,11 @@
 
     el.imageModal = document.getElementById('imageModal');
     el.imageModalImg = document.getElementById('imageModalImg');
+
+    el.confirmModal = document.getElementById('confirmModal');
+    el.confirmText = document.getElementById('confirmText');
+    el.btnConfirmOk = document.getElementById('btnConfirmOk');
+    el.btnConfirmCancel = document.getElementById('btnConfirmCancel');
   }
 
   function escapeHtml(str) {
@@ -532,6 +537,19 @@
 
     var wrongCount = state.currentUserName ? Storage.getWrongQuestions(state.currentUserName).length : 0;
     el.btnReviewWrong.hidden = wrongCount === 0;
+    if (wrongCount > 0) {
+      el.btnReviewWrong.classList.add('btn-primary');
+      el.btnReviewWrong.classList.remove('btn-secondary');
+      el.btnRetake.classList.add('btn-secondary');
+      el.btnRetake.classList.remove('btn-primary');
+      el.btnReviewWrong.style.order = '-1';
+    } else {
+      el.btnReviewWrong.classList.add('btn-secondary');
+      el.btnReviewWrong.classList.remove('btn-primary');
+      el.btnRetake.classList.add('btn-primary');
+      el.btnRetake.classList.remove('btn-secondary');
+      el.btnReviewWrong.style.order = '';
+    }
   }
 
   // ---------- โหมดทบทวนข้อที่ผิด ----------
@@ -581,6 +599,21 @@
     el.imageModal.hidden = true;
   }
 
+  // ---------- กล่องยืนยัน (แทน window.confirm) ----------
+
+  var pendingConfirmAction = null;
+
+  function showConfirm(message, onOk) {
+    el.confirmText.textContent = message;
+    pendingConfirmAction = onOk;
+    el.confirmModal.hidden = false;
+  }
+
+  function hideConfirm() {
+    el.confirmModal.hidden = true;
+    pendingConfirmAction = null;
+  }
+
   // ---------- เริ่มต้นแอป ----------
 
   function bindEvents() {
@@ -611,7 +644,17 @@
       var msg = state.mode === 'review'
         ? 'ออกจากการทบทวนไหม ข้อที่ยังไม่ได้ทำจะรอไว้ให้ครั้งหน้า'
         : 'ออกจากข้อสอบชุดนี้ไหม คะแนนรอบนี้จะไม่ถูกบันทึก';
-      if (window.confirm(msg)) goToStart();
+      showConfirm(msg, goToStart);
+    });
+
+    el.btnConfirmOk.addEventListener('click', function () {
+      var action = pendingConfirmAction;
+      hideConfirm();
+      if (action) action();
+    });
+    el.btnConfirmCancel.addEventListener('click', hideConfirm);
+    el.confirmModal.addEventListener('click', function (e) {
+      if (e.target === el.confirmModal) hideConfirm();
     });
 
     document.addEventListener('keydown', handleKeys);
@@ -624,6 +667,10 @@
   }
 
   function handleKeys(e) {
+    if (!el.confirmModal.hidden) {
+      if (e.key === 'Escape') hideConfirm();
+      return;
+    }
     if (el.screenQuiz.hidden || !el.imageModal.hidden || e.ctrlKey || e.metaKey || e.altKey) return;
     var n = ['1', '2', '3', '4'].indexOf(e.key);
     if (n < 0) n = LETTERS.indexOf(e.key);
