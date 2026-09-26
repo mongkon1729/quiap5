@@ -1,4 +1,4 @@
-// ===== ห้องติว ป.5 : สคริปต์รับคะแนนและข้อสอบ (เวอร์ชัน 2) =====
+// ===== ห้องติว ป.5 : สคริปต์รับคะแนนและข้อสอบ (เวอร์ชัน 3) =====
 // 1) เปลี่ยนรหัสด้านล่างเป็นรหัสลับของครูเอง (ใช้เปิดหน้าครู) ห้ามบอกนักเรียน
 var TEACHER_KEY = 'เปลี่ยนเป็นรหัสลับของครู';
 
@@ -51,8 +51,37 @@ function json_(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+function importExams_(data) {
+  if (data.key !== TEACHER_KEY) return json_({ ok: false, error: 'unauthorized' });
+  var rows = (data.rows || []).slice(0, 500).map(function (row) {
+    var out = [];
+    for (var c = 0; c < EXAM_HEADERS.length; c++) out.push(clip_(row[c], 1000));
+    return out;
+  });
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sheet = getExamSheet_();
+    var existing = {};
+    readExams_().slice(1).forEach(function (r) { existing[r[0] + '|' + r[6]] = true; });
+    var lastTitle = '';
+    var fresh = rows.filter(function (r) {
+      lastTitle = r[0] || lastTitle;
+      return r[6] && !existing[lastTitle + '|' + r[6]];
+    });
+    if (fresh.length) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, fresh.length, EXAM_HEADERS.length)
+        .setNumberFormat('@').setValues(fresh);
+    }
+    return json_({ ok: true, added: fresh.length });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function doPost(e) {
   var data = JSON.parse(e.postData.contents);
+  if (data.action === 'importExams') return importExams_(data);
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {

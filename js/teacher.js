@@ -11,6 +11,7 @@
     analysis: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
     bank: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4z"/><path d="M20 4h-6a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h7z"/></svg>',
     settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+    import: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>',
     sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
     moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
     auto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>',
@@ -22,6 +23,7 @@
     { id: 'students', label: 'ผลนักเรียน' },
     { id: 'analysis', label: 'วิเคราะห์ข้อสอบ' },
     { id: 'bank', label: 'คลังข้อสอบ' },
+    { id: 'import', label: 'นำเข้าข้อสอบ' },
     { id: 'settings', label: 'ตั้งค่า' }
   ];
 
@@ -36,6 +38,9 @@
     analysisExamId: null,
     bankExamId: null,
     sheet: null,
+    draft: null,
+    importMsg: null,
+    importing: false,
     studentQuery: '',
     scriptText: null,
     stats: null
@@ -495,7 +500,7 @@
       '<div class="status-line">' + status + '<span>' + sh.sheetExams.length + ' ชุด • ' + nQ + ' ข้อ</span></div>';
 
     if (sh.sheetStatus === 'error') {
-      html += '<p class="note" style="margin-top:0">ถ้ายังไม่ได้อัปเดตสคริปต์เป็นเวอร์ชัน 2 ให้ทำตามขั้นตอนที่ 1 ด้านล่างก่อน</p>';
+      html += '<p class="note" style="margin-top:0">ถ้ายังไม่ได้อัปเดตสคริปต์เป็นเวอร์ชัน 3 ให้ทำตามขั้นตอนที่ 1 ด้านล่างก่อน</p>';
     }
     if (sh.issues.length) {
       html += '<div class="error-text" style="margin-top:4px"><b>มี ' + sh.issues.length + ' แถวที่ยังไม่ขึ้นเว็บ</b> แก้ในสเปรดชีตแล้วกด "โหลดข้อสอบใหม่"' +
@@ -513,9 +518,9 @@
     return '<details class="panel card block guide"' + (state.sheet && state.sheet.sheetExams.length ? '' : ' open') + '>' +
       '<summary><h2>วิธีเพิ่มข้อสอบผ่าน Google Sheets</h2></summary>' +
       '<ol class="steps" style="margin-top:14px">' +
-      '<li><b>อัปเดตสคริปต์เป็นเวอร์ชัน 2 (ทำครั้งเดียว)</b><br>เปิดสเปรดชีต → ส่วนขยาย → Apps Script → <b>จดรหัสในบรรทัด TEACHER_KEY ไว้ก่อน</b> → ลบโค้ดเดิมทั้งหมด → วางโค้ดใหม่ → ใส่รหัสเดิมกลับใน TEACHER_KEY → กดบันทึก<br>' +
+      '<li><b>อัปเดตสคริปต์เป็นเวอร์ชัน 3 (ทำครั้งเดียว)</b><br>เปิดสเปรดชีต → ส่วนขยาย → Apps Script → <b>จดรหัสในบรรทัด TEACHER_KEY ไว้ก่อน</b> → ลบโค้ดเดิมทั้งหมด → วางโค้ดใหม่ → ใส่รหัสเดิมกลับใน TEACHER_KEY → กดบันทึก<br>' +
         'จากนั้นกด ทำให้ใช้งานได้ → <b>จัดการการทำให้ใช้งานได้</b> → กดรูปดินสอ → ช่องเวอร์ชันเลือก <b>เวอร์ชันใหม่</b> → กดทำให้ใช้งานได้ (ลิงก์เดิมใช้ต่อได้ ไม่ต้องแก้ config.js)' +
-        '<div style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" data-action="copy-script">คัดลอกสคริปต์เวอร์ชัน 2</button> <span id="copyMsg" class="msg ok" hidden>คัดลอกแล้ว</span></div>' +
+        '<div style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" data-action="copy-script">คัดลอกสคริปต์เวอร์ชัน 3</button> <span id="copyMsg" class="msg ok" hidden>คัดลอกแล้ว</span></div>' +
         '<pre class="code-box" id="scriptBox" hidden></pre></li>' +
       '<li>กดปุ่ม <b>โหลดข้อสอบใหม่</b> ด้านบนหนึ่งครั้ง สเปรดชีตจะมีแท็บใหม่ชื่อ <b>ข้อสอบ</b> พร้อมหัวตาราง</li>' +
       '<li>กรอกข้อสอบในแท็บ <b>ข้อสอบ</b> <b>1 แถว = 1 ข้อ</b><table class="plain" style="margin-top:8px"><tbody>' +
@@ -559,6 +564,189 @@
         (q.explanation ? '<p class="exp">' + esc(q.explanation) + '</p>' : '') + '</div>';
     }).join('') + '</div>';
     return html;
+  }
+
+  function questionKey(title, question) {
+    return String(title).trim() + '|' + String(question).trim();
+  }
+
+  function buildDraft(text, filename) {
+    var parsed = ExamImport.parse(text, filename);
+    var existing = {};
+    var sheetTitles = {};
+    var fileTitles = {};
+    (state.sheet ? state.sheet.sheetExams : []).forEach(function (e) {
+      sheetTitles[e.title] = true;
+      e.questions.forEach(function (q) { existing[questionKey(e.title, q.question)] = true; });
+    });
+    state.exams.forEach(function (e) { if (e.source === 'file') fileTitles[e.title] = true; });
+
+    var newCount = 0;
+    var dupCount = 0;
+    parsed.exams.forEach(function (e) {
+      e.appendsTo = !!sheetTitles[e.title];
+      e.clashesWithFile = !!fileTitles[e.title];
+      e.questions.forEach(function (q) {
+        q.duplicate = !!existing[questionKey(e.title, q.question)];
+        if (q.duplicate) dupCount++; else newCount++;
+      });
+    });
+    return { text: text, filename: filename || 'ข้อความที่วาง', exams: parsed.exams, issues: parsed.issues, newCount: newCount, dupCount: dupCount };
+  }
+
+  function renderImport() {
+    var html = head('นำเข้าข้อสอบ', 'ให้ AI ออกข้อสอบ แล้วนำไฟล์มาสร้างชุดข้อสอบในเว็บได้ทันที');
+
+    if (!SHEETS_URL) {
+      return html + '<div class="panel card"><p class="empty-note">ต้องเชื่อม Google Sheets ก่อน ข้อสอบที่นำเข้าจะไปเก็บในสเปรดชีตของครู' +
+        '</p><div style="text-align:center"><button type="button" class="btn btn-primary btn-sm" data-action="nav" data-view="settings">ไปที่ตั้งค่า</button></div></div>';
+    }
+
+    html += '<div class="import-steps">' +
+      '<div class="panel card"><div class="step-no">1</div><h2>ให้ AI ออกข้อสอบ</h2>' +
+        '<p class="note" style="margin-top:0">คัดลอกคำสั่งไปวางใน ChatGPT, Gemini หรือ Claude แก้ส่วนที่อยู่ใน [ ] เป็นวิชา เรื่อง และจำนวนข้อที่ต้องการ</p>' +
+        '<div class="btn-row"><button type="button" class="btn btn-primary btn-sm" data-action="copy-prompt">คัดลอกคำสั่งสำหรับ AI</button>' +
+        '<button type="button" class="btn btn-sm" data-action="download-example">ไฟล์ตัวอย่าง .txt</button></div>' +
+        '<p id="promptMsg" class="msg ok" hidden>คัดลอกแล้ว นำไปวางในแชต AI ได้เลย</p>' +
+        '<details class="peek"><summary>ดูคำสั่งที่จะคัดลอก</summary><pre class="code-box">' + esc(ExamImport.aiPrompt) + '</pre></details></div>' +
+      '<div class="panel card"><div class="step-no">2</div><h2>เลือกไฟล์ หรือวางข้อความ</h2>' +
+        '<label id="dropZone" class="dropzone" for="importFile"><strong>ลากไฟล์มาวางตรงนี้ หรือกดเพื่อเลือกไฟล์</strong>' +
+        '<span>รับไฟล์ .txt .csv .json (บันทึกคำตอบของ AI เป็นไฟล์ .txt ได้เลย)</span></label>' +
+        '<input id="importFile" type="file" accept=".txt,.md,.csv,.tsv,.json,text/plain" hidden />' +
+        '<textarea id="importText" class="import-text" placeholder="หรือคัดลอกคำตอบของ AI มาวางตรงนี้">' + esc(state.pasteText || '') + '</textarea>' +
+        '<button type="button" class="btn btn-secondary btn-sm" data-action="parse-import" style="margin-top:10px">ตรวจข้อสอบ</button></div>' +
+      '</div>';
+
+    if (state.importMsg) {
+      html += '<div class="panel card block import-msg ' + state.importMsg.kind + '"><p class="msg ' + state.importMsg.kind + '" style="margin:0">' + esc(state.importMsg.text) + '</p>' +
+        (state.importMsg.kind === 'ok' ? '<div class="btn-row" style="margin-top:12px"><button type="button" class="btn btn-sm" data-action="nav" data-view="bank">ไปที่คลังข้อสอบ</button></div>' : '') + '</div>';
+    }
+
+    var d = state.draft;
+    if (d) html += draftPreview(d);
+    return html;
+  }
+
+  function draftPreview(d) {
+    var html = '<div class="panel card block draft-panel"><div class="step-no">3</div><h2>ตรวจก่อนเพิ่มเข้าเว็บ</h2>' +
+      '<p class="note" style="margin-top:0">จาก ' + esc(d.filename) + '</p>';
+
+    if (!d.exams.length && !d.issues.length) {
+      html += '<p class="error-text">ไม่พบข้อสอบในไฟล์นี้ ลองดูว่ารูปแบบตรงกับไฟล์ตัวอย่างไหม</p>';
+    }
+
+    html += d.exams.map(function (e) {
+      var fresh = e.questions.filter(function (q) { return !q.duplicate; }).length;
+      var notes = [];
+      if (e.appendsTo) notes.push('<span class="pill pill-blue">เพิ่มต่อท้ายชุดเดิมใน Sheets</span>');
+      else notes.push('<span class="pill pill-mint">ชุดใหม่</span>');
+      if (e.clashesWithFile) notes.push('<span class="pill pill-peach">ชื่อซ้ำกับชุดในไฟล์เว็บ ควรเปลี่ยนชื่อ</span>');
+      if (fresh < e.questions.length) notes.push('<span class="pill">ข้ามข้อที่มีอยู่แล้ว ' + (e.questions.length - fresh) + ' ข้อ</span>');
+      return '<details class="draft-exam"><summary><span class="draft-title"><b>' + esc(e.title) + '</b> • ' + fresh + ' ข้อใหม่' +
+        (e.subject ? ' • ' + esc(e.subject) : '') + (e.minutes ? ' • ' + e.minutes + ' นาที' : '') + '</span>' +
+        '<span class="draft-tags">' + notes.join('') + '</span></summary><div class="q-list" style="margin-top:12px">' +
+        e.questions.map(function (q, qi) {
+          return '<div class="q-card' + (q.duplicate ? ' is-dup' : '') + '"><div class="q-head"><span class="pill pill-yellow">ข้อ ' + (qi + 1) + '</span>' +
+            (q.indicator ? '<span class="pill">' + esc(q.indicator) + '</span>' : '') +
+            (q.bloom ? '<span class="pill pill-blue">' + esc(q.bloom) + '</span>' : '') +
+            (q.duplicate ? '<span class="pill">มีอยู่แล้ว</span>' : '') + '</div>' +
+            '<p class="q-text">' + esc(q.question) + '</p><ol>' + q.choices.map(function (c, ci) {
+              return '<li' + (ci === q.answer ? ' class="is-answer"' : '') + '><b>' + LETTERS[ci] + '.</b><span>' + esc(c) + (ci === q.answer ? ' ✓' : '') + '</span></li>';
+            }).join('') + '</ol>' + (q.explanation ? '<p class="exp">' + esc(q.explanation) + '</p>' : '<p class="exp">ไม่มีคำอธิบาย</p>') + '</div>';
+        }).join('') + '</div></details>';
+    }).join('');
+
+    if (d.issues.length) {
+      html += '<div class="error-text" style="margin-top:14px"><b>' + d.issues.length + ' รายการที่จะไม่ถูกนำเข้า</b> แก้ในไฟล์แล้วตรวจใหม่ได้' +
+        '<ul style="margin:6px 0 0;padding-left:20px">' + d.issues.slice(0, 15).map(function (m) { return '<li>' + esc(m) + '</li>'; }).join('') +
+        (d.issues.length > 15 ? '<li>และอีก ' + (d.issues.length - 15) + ' รายการ</li>' : '') + '</ul></div>';
+    }
+
+    var canSend = d.newCount > 0 && !state.importing;
+    html += '<div class="btn-row" style="margin-top:16px">' +
+      '<button type="button" class="btn btn-primary" data-action="commit-import"' + (canSend ? '' : ' disabled') + '>' +
+      (state.importing ? 'กำลังเพิ่มเข้าเว็บ...' : 'เพิ่มเข้าเว็บ ' + d.newCount + ' ข้อ') + '</button>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-action="clear-import">ยกเลิก</button></div>' +
+      '<p class="note">กดดูรายละเอียดแต่ละชุดเพื่อตรวจคำตอบก่อนได้ ข้อสอบจะไปอยู่ในแท็บ "ข้อสอบ" ของ Google Sheets ถ้าต้องแก้ทีหลัง แก้ในสเปรดชีตได้เลย</p></div>';
+    return html;
+  }
+
+  function readImportFile(file) {
+    if (!file) return;
+    if (/\.(xlsx|xls|docx|doc|pdf)$/i.test(file.name)) {
+      state.draft = null;
+      state.importMsg = { kind: 'bad', text: 'ยังเปิดไฟล์ ' + file.name.split('.').pop().toUpperCase() + ' โดยตรงไม่ได้ ถ้าเป็น Excel ให้บันทึกเป็น "CSV UTF-8" ก่อน ถ้าเป็น Word ให้คัดลอกข้อความมาวางในช่องด้านล่าง' };
+      render();
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function () {
+      state.importMsg = null;
+      state.pasteText = '';
+      state.draft = buildDraft(String(reader.result), file.name);
+      render();
+      scrollToPreview();
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
+  function scrollToPreview() {
+    var target = document.querySelector('.draft-panel, .import-msg');
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function commitImport() {
+    var d = state.draft;
+    var key = lsGet(KEY_STORE);
+    if (!d || !d.newCount) return;
+    if (!key) { state.importMsg = { kind: 'bad', text: 'ยังไม่ได้ใส่รหัสครูในเครื่องนี้ ไปที่ตั้งค่าแล้วกรอกรหัสครูก่อน' }; render(); return; }
+
+    var exams = d.exams.map(function (e) {
+      return { title: e.title, subject: e.subject, minutes: e.minutes, questions: e.questions.filter(function (q) { return !q.duplicate; }) };
+    }).filter(function (e) { return e.questions.length; });
+    var expected = [];
+    exams.forEach(function (e) { e.questions.forEach(function (q) { expected.push(questionKey(e.title, q.question)); }); });
+
+    state.importing = true;
+    state.importMsg = null;
+    render();
+
+    fetch(SHEETS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'importExams', key: key, rows: ExamImport.toRows(exams) })
+    }).then(function () {
+      return new Promise(function (resolve) { setTimeout(resolve, 1500); });
+    }).then(function () {
+      var calls = 0;
+      ExamSource.load(function (data) {
+        calls++;
+        if (calls === 1) return;
+        state.exams = data.exams;
+        state.sheet = data;
+        analyze();
+        var have = {};
+        data.sheetExams.forEach(function (e) { e.questions.forEach(function (q) { have[questionKey(e.title, q.question)] = true; }); });
+        var found = expected.filter(function (k) { return have[k]; }).length;
+        state.importing = false;
+        if (data.sheetStatus === 'fresh' && found === expected.length) {
+          state.draft = null;
+          state.pasteText = '';
+          state.importMsg = { kind: 'ok', text: 'เพิ่มเข้าเว็บแล้ว ' + found + ' ข้อ นักเรียนจะเห็นชุดข้อสอบนี้เมื่อเปิดเว็บครั้งถัดไป' };
+        } else if (found > 0) {
+          state.importMsg = { kind: 'bad', text: 'เพิ่มได้ ' + found + ' จาก ' + expected.length + ' ข้อ ลองกดเพิ่มอีกครั้ง ข้อที่มีแล้วจะถูกข้ามให้เอง' };
+          state.draft = buildDraft(d.text, d.filename);
+        } else {
+          state.importMsg = { kind: 'bad', text: 'ยังไม่เห็นข้อสอบใหม่ใน Google Sheets ตรวจว่าอัปเดตสคริปต์เป็นเวอร์ชัน 3 แล้ว (คลังข้อสอบ > วิธีเพิ่มข้อสอบ) และรหัสครูในเครื่องนี้ถูกต้อง' };
+        }
+        render();
+      });
+    }).catch(function () {
+      state.importing = false;
+      state.importMsg = { kind: 'bad', text: 'ส่งข้อมูลไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง' };
+      render();
+    });
   }
 
   function renderSettings() {
@@ -647,11 +835,37 @@
     if (!state.stats) analyze();
     renderNav();
     renderDemoBanner();
-    var views = { overview: renderOverview, students: renderStudents, analysis: renderAnalysis, bank: renderBank, settings: renderSettings };
+    var views = { overview: renderOverview, students: renderStudents, analysis: renderAnalysis, bank: renderBank, import: renderImport, settings: renderSettings };
     var view = $('view');
     view.innerHTML = '<div class="view">' + views[state.view]() + '</div>';
     $('aside').innerHTML = renderAside();
     if ($('scriptBox')) loadScript();
+    bindDropZone();
+  }
+
+  function bindDropZone() {
+    var zone = $('dropZone');
+    if (!zone) return;
+    ['dragenter', 'dragover'].forEach(function (type) {
+      zone.addEventListener(type, function (e) { e.preventDefault(); zone.classList.add('over'); });
+    });
+    ['dragleave', 'drop'].forEach(function (type) {
+      zone.addEventListener(type, function () { zone.classList.remove('over'); });
+    });
+    zone.addEventListener('drop', function (e) {
+      e.preventDefault();
+      readImportFile(e.dataTransfer.files[0]);
+    });
+  }
+
+  function downloadExample() {
+    var blob = new Blob(['﻿' + ExamImport.example], { type: 'text/plain;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'ตัวอย่างข้อสอบ.txt';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
   }
 
   function go(view) {
@@ -713,6 +927,18 @@
     else if (a === 'copy-script') copyScript();
     else if (a === 'copy-header') copyText(EXAM_HEADERS.join('\t'), 'headerMsg');
     else if (a === 'reload-exams') reloadExams();
+    else if (a === 'copy-prompt') copyText(ExamImport.aiPrompt, 'promptMsg');
+    else if (a === 'download-example') downloadExample();
+    else if (a === 'parse-import') {
+      var text = $('importText').value;
+      state.pasteText = text;
+      state.importMsg = text.trim() ? null : { kind: 'bad', text: 'วางข้อความข้อสอบในช่องก่อน หรือเลือกไฟล์' };
+      state.draft = text.trim() ? buildDraft(text, '') : null;
+      render();
+      scrollToPreview();
+    }
+    else if (a === 'commit-import') commitImport();
+    else if (a === 'clear-import') { state.draft = null; state.importMsg = null; state.pasteText = ''; render(); }
     else if (a === 'forget-key') { lsSet(KEY_STORE, null); state.connected = false; showLock(); }
   }
 
@@ -793,6 +1019,9 @@
     document.addEventListener('click', onClick);
     document.addEventListener('input', onInput);
     document.addEventListener('submit', onSubmit);
+    document.addEventListener('change', function (e) {
+      if (e.target.id === 'importFile') readImportFile(e.target.files[0]);
+    });
     bindLock();
 
     var started = false;

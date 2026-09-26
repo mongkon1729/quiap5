@@ -279,6 +279,67 @@ table.plain td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
   line-height: 1.5;
   white-space: pre;
 }
+/* import */
+.import-steps { display: grid; grid-template-columns: 1fr; gap: 18px; margin-bottom: 26px; }
+@media (min-width: 1100px) { .import-steps { grid-template-columns: 1fr 1fr; align-items: start; } }
+.import-steps h2, .block > h2 { font-size: 18px; margin: 0 0 8px; }
+.step-no {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 10px;
+  border: var(--border);
+  border-radius: 50%;
+  background: var(--yellow);
+  color: #23212c;
+  font-weight: 800;
+}
+.btn-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn-row .btn:not(.btn-sm) { width: auto; }
+.peek { margin-top: 12px; }
+.peek summary { cursor: pointer; font-size: 14px; color: var(--ink-soft); min-height: 32px; }
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 120px;
+  padding: 18px;
+  border: 2px dashed var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  text-align: center;
+  cursor: pointer;
+  transition: background .2s, transform .15s var(--ease);
+}
+.dropzone:hover, .dropzone.over { background: var(--accent-soft); transform: translateY(-1px); }
+.dropzone span { font-size: 14px; color: var(--ink-soft); }
+.import-text {
+  width: 100%;
+  min-height: 130px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.import-text:focus { outline: none; background: var(--paper); box-shadow: var(--shadow-sm); }
+.import-msg.ok { background: var(--correct-bg); }
+.import-msg.bad { background: var(--wrong-bg); }
+.draft-exam { border: var(--border); border-radius: var(--radius-sm); padding: 10px 14px; margin-top: 12px; background: var(--paper-2); }
+.draft-exam summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px; }
+.draft-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.draft-tags .pill { white-space: normal; font-size: 12px; }
+.q-card.is-dup { opacity: .55; }
+.q-list .q-card { border: var(--border); border-radius: var(--radius-sm); background: var(--paper); }
+
 .guide summary {
   display: flex;
   align-items: center;
