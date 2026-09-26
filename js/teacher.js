@@ -512,7 +512,7 @@
       '<li>กดปุ่มด้านล่างเพื่อคัดลอกสคริปต์ แล้ววางลงไป จากนั้น<b>แก้บรรทัด TEACHER_KEY</b> เป็นรหัสลับของครูเอง แล้วกดบันทึก (รูปแผ่นดิสก์)' +
         '<div style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" data-action="copy-script">คัดลอกสคริปต์</button> <span id="copyMsg" class="msg ok" hidden>คัดลอกแล้ว</span></div>' +
         '<pre class="code-box" id="scriptBox">กำลังโหลด...</pre></li>' +
-      '<li>กดปุ่ม <b>ทำให้ใช้งานได้ (Deploy) → การทำให้ใช้งานได้รายการใหม่ (New deployment)</b> กดรูปเฟืองเลือก <b>เว็บแอป (Web app)</b><br>ตั้ง "เรียกใช้ในฐานะ" เป็น <b>ฉัน (Me)</b> และ "ผู้ที่มีสิทธิ์เข้าถึง" เป็น <b>ทุกคน (Anyone)</b> แล้วกด Deploy และกดอนุญาตสิทธิ์ด้วยบัญชี Google ของครู</li>' +
+      '<li>กดปุ่ม <b>ทำให้ใช้งานได้ (Deploy) → การทำให้ใช้งานได้รายการใหม่ (New deployment)</b> กดรูปเฟืองเลือก <b>เว็บแอป (Web app)</b><br>ตั้ง "เรียกใช้ในฐานะ" เป็น <b>ฉัน (Me)</b> และ "ผู้ที่มีสิทธิ์เข้าถึง" เป็น <b>ทุกคน (Anyone)</b> (ต้องเป็น "ทุกคน" เฉยๆ ไม่ใช่ "ทุกคนที่มีบัญชี Google") แล้วกด Deploy และกดอนุญาตสิทธิ์ด้วยบัญชี Google ของครู</li>' +
       '<li>คัดลอก <b>URL ของเว็บแอป</b> (ขึ้นต้นด้วย <code>https://script.google.com/macros/s/</code>)</li>' +
       '<li>เปิดไฟล์ <code>js/config.js</code> ในโฟลเดอร์ quiap5 (คลิกขวา → Open with → Notepad) วาง URL ไว้ระหว่างเครื่องหมาย <code>\'\'</code> หลังคำว่า sheetsUrl แล้วบันทึก จากนั้น Commit และ Push ด้วย GitHub Desktop</li>' +
       '<li>รอ 1-2 นาที เปิดหน้านี้ใหม่ แล้วกรอกรหัสครูที่ตั้งไว้ในขั้นตอนที่ 3</li>' +
@@ -665,7 +665,7 @@
       state.connected = true;
       setRows(data.rows, false);
     }, function () {
-      throw new Error('ติดต่อ Google Sheets ไม่ได้ ตรวจอินเทอร์เน็ต และลิงก์ใน js/config.js');
+      throw new Error('ติดต่อ Google Sheets ไม่ได้ ตรวจว่าตอน Deploy ตั้ง "ผู้ที่มีสิทธิ์เข้าถึง" เป็น "ทุกคน (Anyone)" แล้ว และลิงก์ใน js/config.js ถูกต้อง');
     });
   }
 
