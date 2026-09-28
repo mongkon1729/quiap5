@@ -1,4 +1,4 @@
-// ===== ห้องติว ป.5 : สคริปต์รับคะแนนและข้อสอบ (เวอร์ชัน 4) =====
+// ===== ห้องติว ป.5 : สคริปต์รับคะแนนและข้อสอบ (เวอร์ชัน 5) =====
 // 1) เปลี่ยนรหัสด้านล่างเป็นรหัสลับของครูเอง (ใช้เปิดหน้าครู) ห้ามบอกนักเรียน
 var TEACHER_KEY = 'เปลี่ยนเป็นรหัสลับของครู';
 
@@ -104,9 +104,87 @@ function importExams_(data) {
   }
 }
 
+// Finds the sheet row the teacher is editing and checks it still holds the same question,
+// so an edit never lands on the wrong row after someone changed the sheet by hand.
+function findQuestionRow_(sheet, header, data) {
+  var row = Math.floor(num_(data.row));
+  var questionCol = header.indexOf('คำถาม');
+  if (row < 2 || row > sheet.getLastRow() || questionCol < 0) return 0;
+  var current = sheet.getRange(row, questionCol + 1).getDisplayValue();
+  return String(current).trim() === String(data.expect || '').trim() ? row : 0;
+}
+
+// data: { row, expect, fields: { 'คำถาม': ..., 'ก': ..., 'รูปภาพ': ... } }
+function updateQuestion_(data) {
+  if (data.key !== TEACHER_KEY) return json_({ ok: false, error: 'unauthorized' });
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sheet = getExamSheet_();
+    var fields = data.fields || {};
+    var header = examHeaders_(sheet, Object.keys(fields).map(function (k) { return clip_(k, 40); }));
+    var row = findQuestionRow_(sheet, header, data);
+    if (!row) return json_({ ok: false, error: 'moved' });
+    Object.keys(fields).forEach(function (k) {
+      var col = header.indexOf(k);
+      if (col >= 0) sheet.getRange(row, col + 1).setNumberFormat('@').setValue(clip_(fields[k], 1000));
+    });
+    return json_({ ok: true });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Set-level info usually sits only on a set's first row, so pass it down before deleting that row.
+function deleteQuestion_(data) {
+  if (data.key !== TEACHER_KEY) return json_({ ok: false, error: 'unauthorized' });
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sheet = getExamSheet_();
+    var header = examHeaders_(sheet, []);
+    var row = findQuestionRow_(sheet, header, data);
+    if (!row) return json_({ ok: false, error: 'moved' });
+    var titleCol = header.indexOf('ชุดข้อสอบ');
+    if (row < sheet.getLastRow() && titleCol >= 0) {
+      var both = sheet.getRange(row, 1, 2, header.length).getDisplayValues();
+      if (both[0][titleCol] && !both[1][titleCol]) {
+        var perQuestion = ['หัวข้อ', 'ตัวชี้วัด', 'Bloom', 'คำถาม', 'ก', 'ข', 'ค', 'ง', 'คำตอบ', 'คำอธิบาย', 'รูปภาพ', 'ความยาก'];
+        var next = both[1].map(function (v, i) {
+          return v || perQuestion.indexOf(header[i]) >= 0 ? v : both[0][i];
+        });
+        sheet.getRange(row + 1, 1, 1, header.length).setNumberFormat('@').setValues([next]);
+      }
+    }
+    sheet.deleteRow(row);
+    return json_({ ok: true });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+var IMAGE_FOLDER = 'ห้องติว ป.5 - รูปข้อสอบ';
+
+// data: { name, mimeType, base64 } -> saves into a Drive folder anyone with the link can view
+function uploadImage_(data) {
+  if (data.key !== TEACHER_KEY) return json_({ ok: false, error: 'unauthorized' });
+  var mime = String(data.mimeType || '');
+  if (['image/png', 'image/jpeg', 'image/gif', 'image/webp'].indexOf(mime) < 0) return json_({ ok: false, error: 'type' });
+  var bytes = Utilities.base64Decode(String(data.base64 || ''));
+  if (!bytes.length || bytes.length > 5 * 1024 * 1024) return json_({ ok: false, error: 'size' });
+  var folders = DriveApp.getFoldersByName(IMAGE_FOLDER);
+  var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(IMAGE_FOLDER);
+  var file = folder.createFile(Utilities.newBlob(bytes, mime, clip_(data.name, 100) || 'image'));
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return json_({ ok: true, url: 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w1200' });
+}
+
 function doPost(e) {
   var data = JSON.parse(e.postData.contents);
   if (data.action === 'importExams') return importExams_(data);
+  if (data.action === 'updateQuestion') return updateQuestion_(data);
+  if (data.action === 'deleteQuestion') return deleteQuestion_(data);
+  if (data.action === 'uploadImage') return uploadImage_(data);
   if (!data.student || !data.examId) return json_({ ok: false, error: 'missing fields' });
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -141,7 +219,7 @@ function doPost(e) {
 
 function doGet(e) {
   if (e.parameter.action === 'exams') {
-    return json_({ ok: true, version: 4, values: readExams_() });
+    return json_({ ok: true, version: 5, values: readExams_() });
   }
   if (!e.parameter.key || e.parameter.key !== TEACHER_KEY) {
     return json_({ ok: false, error: 'unauthorized' });

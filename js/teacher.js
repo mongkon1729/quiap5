@@ -2,6 +2,7 @@
   'use strict';
 
   var KEY_STORE = 'quizapp_teacher_key_v1';
+  var SCRIPT_VERSION = 5;
   var SHEETS_URL = (window.QUIZ_CONFIG && window.QUIZ_CONFIG.sheetsUrl || '').trim();
   var LETTERS = ['ก', 'ข', 'ค', 'ง'];
 
@@ -37,6 +38,7 @@
     studentKey: null,
     analysisExamId: null,
     bankExamId: null,
+    edit: null,
     sheet: null,
     draft: null,
     importMsg: null,
@@ -725,9 +727,9 @@
       '<div class="status-line">' + status + '<span>' + sh.sheetExams.length + ' ชุด • ' + nQ + ' ข้อ</span></div>';
 
     if (sh.sheetStatus === 'error') {
-      html += '<p class="note" style="margin-top:0">ถ้ายังไม่ได้อัปเดตสคริปต์เป็นเวอร์ชัน 4 ให้ทำตามขั้นตอนที่ 1 ด้านล่างก่อน</p>';
-    } else if (sh.scriptVersion && sh.scriptVersion < 4) {
-      html += '<p class="error-text" style="margin-top:4px">สคริปต์ Google ยังเป็นเวอร์ชัน ' + sh.scriptVersion + ' ให้อัปเดตเป็นเวอร์ชัน 4 (ขั้นตอนที่ 1 ด้านล่าง) เพื่อบันทึกข้อมูลหลักสูตร ระดับชั้น หน่วย และความยาก</p>';
+      html += '<p class="note" style="margin-top:0">ถ้ายังไม่ได้อัปเดตสคริปต์เป็นเวอร์ชัน 5 ให้ทำตามขั้นตอนที่ 1 ด้านล่างก่อน</p>';
+    } else if (sh.scriptVersion && sh.scriptVersion < SCRIPT_VERSION) {
+      html += '<p class="error-text" style="margin-top:4px">สคริปต์ Google ยังเป็นเวอร์ชัน ' + sh.scriptVersion + ' ให้อัปเดตเป็นเวอร์ชัน ' + SCRIPT_VERSION + ' (ขั้นตอนที่ 1 ด้านล่าง) เพื่อแก้ข้อสอบทีละข้อและอัปโหลดรูปจากหน้านี้ได้</p>';
     }
     if (sh.issues.length) {
       html += '<div class="error-text" style="margin-top:4px"><b>มี ' + sh.issues.length + ' แถวที่ยังไม่ขึ้นเว็บ</b> แก้ในสเปรดชีตแล้วกด "โหลดข้อสอบใหม่"' +
@@ -742,13 +744,13 @@
 
   function sheetGuide() {
     if (!SHEETS_URL) return '';
-    var needsUpdate = state.sheet && state.sheet.scriptVersion && state.sheet.scriptVersion < 4;
+    var needsUpdate = state.sheet && state.sheet.scriptVersion && state.sheet.scriptVersion < SCRIPT_VERSION;
     return '<details class="panel card block guide"' + (state.sheet && state.sheet.sheetExams.length && !needsUpdate ? '' : ' open') + '>' +
       '<summary><h2>วิธีเพิ่มข้อสอบผ่าน Google Sheets</h2></summary>' +
       '<ol class="steps" style="margin-top:14px">' +
-      '<li><b>อัปเดตสคริปต์เป็นเวอร์ชัน 4 (ทำครั้งเดียว)</b><br>เปิดสเปรดชีต → ส่วนขยาย → Apps Script → <b>จดรหัสในบรรทัด TEACHER_KEY ไว้ก่อน</b> → ลบโค้ดเดิมทั้งหมด → วางโค้ดใหม่ → ใส่รหัสเดิมกลับใน TEACHER_KEY → กดบันทึก<br>' +
-        'จากนั้นกด ทำให้ใช้งานได้ → <b>จัดการการทำให้ใช้งานได้</b> → กดรูปดินสอ → ช่องเวอร์ชันเลือก <b>เวอร์ชันใหม่</b> → กดทำให้ใช้งานได้ (ลิงก์เดิมใช้ต่อได้ ไม่ต้องแก้ config.js)' +
-        '<div style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" data-action="copy-script">คัดลอกสคริปต์เวอร์ชัน 4</button> <span id="copyMsg" class="msg ok" hidden>คัดลอกแล้ว</span></div>' +
+      '<li><b>อัปเดตสคริปต์เป็นเวอร์ชัน ' + SCRIPT_VERSION + ' (ทำครั้งเดียว)</b><br>เปิดสเปรดชีต → ส่วนขยาย → Apps Script → <b>จดรหัสในบรรทัด TEACHER_KEY ไว้ก่อน</b> → ลบโค้ดเดิมทั้งหมด → วางโค้ดใหม่ → ใส่รหัสเดิมกลับใน TEACHER_KEY → กดบันทึก<br>' +
+        'จากนั้นกด ทำให้ใช้งานได้ → <b>จัดการการทำให้ใช้งานได้</b> → กดรูปดินสอ → ช่องเวอร์ชันเลือก <b>เวอร์ชันใหม่</b> → กดทำให้ใช้งานได้ ถ้า Google ขออนุญาตเข้าถึง Google Drive ให้กดอนุญาต (ใช้เก็บรูปที่ครูอัปโหลด) ลิงก์เดิมใช้ต่อได้ ไม่ต้องแก้ config.js' +
+        '<div style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" data-action="copy-script">คัดลอกสคริปต์เวอร์ชัน ' + SCRIPT_VERSION + '</button> <span id="copyMsg" class="msg ok" hidden>คัดลอกแล้ว</span></div>' +
         '<pre class="code-box" id="scriptBox" hidden></pre></li>' +
       '<li>กดปุ่ม <b>โหลดข้อสอบใหม่</b> ด้านบนหนึ่งครั้ง สเปรดชีตจะมีแท็บใหม่ชื่อ <b>ข้อสอบ</b> พร้อมหัวตาราง</li>' +
       '<li>กรอกข้อสอบในแท็บ <b>ข้อสอบ</b> <b>1 แถว = 1 ข้อ</b><table class="plain" style="margin-top:8px"><tbody>' +
@@ -759,7 +761,7 @@
         '<tr><td><b>คำถาม, ก, ข, ค, ง</b></td><td>จำเป็นต้องใส่ทั้งหมด</td></tr>' +
         '<tr><td><b>คำตอบ</b></td><td>พิมพ์ ก ข ค หรือ ง</td></tr>' +
         '<tr><td><b>คำอธิบาย</b></td><td>เหตุผลที่นักเรียนจะเห็นหลังตอบ</td></tr>' +
-        '<tr><td><b>รูปภาพ</b></td><td>ไม่บังคับ ใส่ลิงก์รูปที่เปิดดูได้โดยตรง</td></tr>' +
+        '<tr><td><b>รูปภาพ</b></td><td>ไม่บังคับ ใส่ลิงก์รูปที่เปิดดูได้โดยตรง หรือกดแก้ไขข้อนั้นในหน้าคลังข้อสอบแล้วอัปโหลดรูปจากเครื่อง</td></tr>' +
         '</tbody></table></li>' +
       '<li><b>มีข้อสอบใน Excel อยู่แล้ว:</b> เรียงคอลัมน์ใน Excel ให้ตรงกับหัวตาราง แล้วคัดลอกทั้งหมดไปวางในแท็บข้อสอบ ตั้งแต่แถวที่ 2' +
         '<div style="margin-top:10px"><button type="button" class="btn btn-sm" data-action="copy-header">คัดลอกหัวตารางไปวางใน Excel</button> <span id="headerMsg" class="msg ok" hidden>คัดลอกแล้ว</span></div></li>' +
@@ -785,18 +787,274 @@
       '<span class="pill">' + exam.questions.length + ' ข้อ</span><span class="pill">' + (exam.timeLimitMinutes || 15) + ' นาที</span></div>' +
       '<div class="meta wide">' + metaTable(exam, true).replace(/^<dl class="meta">|<\/dl>$/g, '') + '</div></div>';
     html += blueprint(exam);
+    var editable = exam.source === 'sheets' && !!SHEETS_URL;
+    var ed = state.edit && state.edit.examId === exam.id ? state.edit : null;
+    if (!editable) {
+      html += '<p class="note no-print">ชุดนี้มาจากไฟล์ในเว็บ (data/questions.json) แก้ทีละข้อจากหน้านี้ไม่ได้ ถ้าอยากแก้ในหน้านี้ ให้นำเข้าชุดนี้ไปไว้ใน Google Sheets ก่อน</p>';
+    }
+    if (ed && ed.msg && ed.msg.kind === 'ok') html += '<p class="msg ok no-print" id="editDone">' + esc(ed.msg.text) + '</p>';
     html += '<div class="q-list">' + exam.questions.map(function (q, qi) {
+      if (ed && ed.qid === q.id) return editForm(exam, q, qi);
       return '<div class="q-card card"><div class="q-head"><span class="pill pill-yellow">ข้อ ' + (qi + 1) + '</span>' +
         (q.indicator ? '<span class="pill">' + esc(q.indicator) + '</span>' : '') +
-        (q.bloom ? '<span class="pill pill-blue">' + esc(q.bloom) + '</span>' : '') + diffPill(q.difficulty) + '</div>' +
+        (q.bloom ? '<span class="pill pill-blue">' + esc(q.bloom) + '</span>' : '') + diffPill(q.difficulty) +
+        (editable ? '<button type="button" class="btn btn-sm q-edit-btn no-print" data-action="edit-q" data-qid="' + esc(q.id) + '"' + (ed && ed.busy ? ' disabled' : '') + '>แก้ไขข้อนี้</button>' : '') + '</div>' +
         '<p class="q-text">' + esc(q.question) + '</p>' +
         (q.image ? '<img src="' + esc(q.image) + '" alt="' + esc(q.question) + '" style="max-width:100%;border:var(--border);border-radius:12px;margin-bottom:10px" />' : '') +
         '<ol>' + q.choices.map(function (c, ci) {
           return '<li' + (ci === q.answer ? ' class="is-answer"' : '') + '><b>' + LETTERS[ci] + '.</b><span>' + esc(c) + (ci === q.answer ? ' ✓' : '') + '</span></li>';
         }).join('') + '</ol>' +
         (q.explanation ? '<p class="exp">' + esc(q.explanation) + '</p>' : '') + '</div>';
-    }).join('') + '</div>';
+    }).join('') + (ed && ed.qid === 'new' ? editForm(exam, null, exam.questions.length) : '') + '</div>';
+    if (editable && !(ed && ed.qid === 'new')) {
+      html += '<div class="btn-row no-print" style="margin-top:14px"><button type="button" class="btn btn-primary" data-action="edit-q" data-qid="new">+ เพิ่มข้อใหม่ในชุดนี้</button></div>';
+    }
     return html;
+  }
+
+  // ---------- edit one question (sheet exams only) ----------
+
+  function editForm(exam, q, qi) {
+    var ed = state.edit;
+    var v = q || { question: '', choices: ['', '', '', ''], answer: -1, explanation: '', image: '', indicator: '', topic: '', bloom: '', difficulty: '' };
+    function text(id, label, value, placeholder) {
+      return '<label class="pick-field">' + label + '<input type="text" id="' + id + '" value="' + esc(value || '') + '" placeholder="' + esc(placeholder || '') + '" /></label>';
+    }
+    var blooms = [''].concat(BLOOM_ORDER, v.bloom && BLOOM_ORDER.indexOf(v.bloom) < 0 ? [v.bloom] : []);
+    var diffs = [''].concat(ExamSource.DIFFICULTIES, v.difficulty && ExamSource.DIFFICULTIES.indexOf(v.difficulty) < 0 ? [v.difficulty] : []);
+    var bloomOpts = blooms.map(function (b) { return '<option' + (v.bloom === b ? ' selected' : '') + ' value="' + esc(b) + '">' + (b || '-') + '</option>'; }).join('');
+    var diffOpts = diffs.map(function (d) { return '<option' + (v.difficulty === d ? ' selected' : '') + ' value="' + esc(d) + '">' + (d || '-') + '</option>'; }).join('');
+    return '<form class="q-card card edit-card no-print" id="editForm" data-qid="' + esc(q ? q.id : 'new') + '">' +
+      '<div class="q-head"><span class="pill pill-yellow">' + (q ? 'แก้ไขข้อ ' + (qi + 1) : 'ข้อใหม่ (ข้อ ' + (qi + 1) + ')') + '</span></div>' +
+      '<label class="pick-field">คำถาม<textarea id="edQuestion" rows="3">' + esc(v.question) + '</textarea></label>' +
+      (q ? '<p class="note" style="margin:4px 0 0">ถ้าแก้ข้อความคำถาม ประวัติ "ข้อที่เคยตอบผิด" ของนักเรียนในข้อนี้จะเริ่มนับใหม่</p>' : '') +
+      '<fieldset class="ed-choices"><legend>ตัวเลือก (แตะวงกลมหน้าข้อที่ถูก)</legend>' + LETTERS.map(function (L, ci) {
+        return '<div class="ed-choice"><label class="ed-radio" title="ข้อ ' + L + ' ถูก"><input type="radio" name="edAnswer" value="' + ci + '"' + (v.answer === ci ? ' checked' : '') + ' /><b>' + L + '</b></label>' +
+          '<input type="text" id="edChoice' + ci + '" value="' + esc(v.choices[ci]) + '" aria-label="ตัวเลือก ' + L + '" /></div>';
+      }).join('') + '</fieldset>' +
+      '<label class="pick-field">คำอธิบาย (นักเรียนเห็นหลังตอบ)<textarea id="edExplanation" rows="2">' + esc(v.explanation) + '</textarea></label>' +
+      '<div class="ed-image"><span class="ed-label">รูปประกอบ</span>' +
+        '<img id="edImagePreview" alt="" src="' + esc(v.image || '') + '"' + (v.image ? '' : ' hidden') + ' />' +
+        '<input type="hidden" id="edImage" value="' + esc(v.image || '') + '" />' +
+        '<div class="btn-row"><label class="btn btn-sm btn-secondary ed-upload">เลือกรูปจากเครื่อง<input type="file" id="edImageFile" accept="image/*" hidden /></label>' +
+        '<button type="button" class="btn btn-sm btn-ghost" data-action="remove-image" id="edImageRemove"' + (v.image ? '' : ' hidden') + '>เอารูปออก</button></div>' +
+        '<p class="msg" id="edImageMsg" hidden></p></div>' +
+      '<details class="ed-more"><summary>ข้อมูลเพิ่มเติม (ตัวชี้วัด หัวข้อ Bloom ความยาก)</summary><div class="pick-fields">' +
+        text('edIndicator', 'ตัวชี้วัด', v.indicator, 'เช่น ส 3.1 ป.5/1') + text('edTopic', 'หัวข้อ', v.topic === v.indicator ? '' : v.topic, '') +
+        '<label class="pick-field">Bloom<select id="edBloom">' + bloomOpts + '</select></label>' +
+        '<label class="pick-field">ความยาก<select id="edDifficulty">' + diffOpts + '</select></label>' +
+      '</div></details>' +
+      (ed.msg && ed.msg.kind === 'bad' ? '<p class="msg bad" role="alert">' + esc(ed.msg.text) + '</p>' : '') +
+      '<div class="btn-row" style="margin-top:12px">' +
+        '<button type="button" class="btn btn-primary" data-action="save-q"' + (ed.busy ? ' disabled' : '') + '>' + (ed.busy === 'save' ? 'กำลังบันทึก...' : 'บันทึก') + '</button>' +
+        '<button type="button" class="btn btn-sm" data-action="cancel-edit"' + (ed.busy ? ' disabled' : '') + '>ยกเลิก</button>' +
+        (q ? '<button type="button" class="btn btn-sm btn-ghost ed-delete" data-action="delete-q"' + (ed.busy ? ' disabled' : '') + '>' + (ed.busy === 'delete' ? 'กำลังลบ...' : 'ลบข้อนี้') + '</button>' : '') +
+      '</div></form>';
+  }
+
+  function readEditForm() {
+    var checked = document.querySelector('input[name="edAnswer"]:checked');
+    return {
+      question: $('edQuestion').value.trim(),
+      choices: [0, 1, 2, 3].map(function (i) { return $('edChoice' + i).value.trim(); }),
+      answer: checked ? Number(checked.value) : -1,
+      explanation: $('edExplanation').value.trim(),
+      image: $('edImage').value.trim(),
+      indicator: $('edIndicator').value.trim(),
+      topic: $('edTopic').value.trim(),
+      bloom: $('edBloom').value,
+      difficulty: $('edDifficulty').value
+    };
+  }
+
+  function editFields(v) {
+    return {
+      'คำถาม': v.question, 'ก': v.choices[0], 'ข': v.choices[1], 'ค': v.choices[2], 'ง': v.choices[3],
+      'คำตอบ': LETTERS[v.answer], 'คำอธิบาย': v.explanation, 'รูปภาพ': v.image,
+      'ตัวชี้วัด': v.indicator, 'หัวข้อ': v.topic, 'Bloom': v.bloom, 'ความยาก': v.difficulty
+    };
+  }
+
+  function editError(text) {
+    state.edit.busy = false;
+    state.edit.msg = { kind: 'bad', text: text };
+    renderKeepEdit();
+  }
+
+  // Re-renders while keeping what the teacher typed and the scroll position on the form.
+  function renderKeepEdit() {
+    var draft = $('editForm') ? readEditForm() : null;
+    render();
+    if (draft && $('editForm')) {
+      $('edQuestion').value = draft.question;
+      draft.choices.forEach(function (c, i) { $('edChoice' + i).value = c; });
+      var r = document.querySelector('input[name="edAnswer"][value="' + draft.answer + '"]');
+      if (r) r.checked = true;
+      $('edExplanation').value = draft.explanation;
+      setEditImage(draft.image);
+      $('edIndicator').value = draft.indicator;
+      $('edTopic').value = draft.topic;
+      $('edBloom').value = draft.bloom;
+      $('edDifficulty').value = draft.difficulty;
+    }
+    var form = $('editForm') || $('editDone');
+    if (form) form.scrollIntoView({ block: 'center' });
+  }
+
+  function setEditImage(url) {
+    $('edImage').value = url || '';
+    $('edImagePreview').src = url || '';
+    $('edImagePreview').hidden = !url;
+    $('edImageRemove').hidden = !url;
+  }
+
+  function needsVersion(min) {
+    var version = state.sheet && state.sheet.scriptVersion;
+    if (version && version < min) {
+      return 'สคริปต์ Google ยังเป็นเวอร์ชัน ' + version + ' ต้องอัปเดตเป็นเวอร์ชัน ' + SCRIPT_VERSION + ' ก่อน ดูวิธีที่ คลังข้อสอบ > วิธีเพิ่มข้อสอบผ่าน Google Sheets ขั้นตอนที่ 1';
+    }
+    return '';
+  }
+
+  function postScript(body) {
+    body.key = lsGet(KEY_STORE);
+    return fetch(SHEETS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body)
+    }).then(function (res) { return res.json(); });
+  }
+
+  function replyProblem(reply) {
+    if (reply && reply.error === 'unauthorized') return 'รหัสครูในเครื่องนี้ไม่ตรงกับ TEACHER_KEY ในสคริปต์ ไปที่ ตั้งค่า แล้วกรอกรหัสครูใหม่';
+    if (reply && reply.error === 'moved') return 'ข้อนี้ในสเปรดชีตถูกแก้หรือย้ายไปแล้ว กด "ยกเลิก" แล้วกด "โหลดข้อสอบใหม่" ในหน้าคลังข้อสอบ จากนั้นลองแก้อีกครั้ง';
+    if (!reply || !reply.ok) return 'สคริปต์ Google ยังไม่รองรับการแก้ทีละข้อ ให้อัปเดตสคริปต์เป็นเวอร์ชัน ' + SCRIPT_VERSION + ' ก่อน';
+    return '';
+  }
+
+  // Reloads sheet exams and keeps the teacher on the same set (its id comes from the set title).
+  function reloadAfterEdit(doneText) {
+    var calls = 0;
+    ExamSource.load(function (data) {
+      calls++;
+      if (calls === 1) return;
+      state.exams = data.exams;
+      state.sheet = data;
+      state.stats = null;
+      analyze();
+      state.edit = { examId: state.bankExamId, qid: null, busy: false, msg: { kind: 'ok', text: doneText } };
+      renderKeepEdit();
+    });
+  }
+
+  function startEdit(qid) {
+    state.edit = { examId: state.bankExamId, qid: qid, busy: false, msg: null };
+    render();
+    var form = $('editForm');
+    if (form) { form.scrollIntoView({ block: 'start' }); $('edQuestion').focus(); }
+  }
+
+  function saveEdit() {
+    var ed = state.edit;
+    var exam = examById(ed.examId);
+    if (!exam || ed.busy) return;
+    var q = ed.qid === 'new' ? null : exam.questions.find(function (x) { return x.id === ed.qid; });
+    var v = readEditForm();
+    if (!v.question) return editError('ยังไม่ได้พิมพ์คำถาม');
+    if (v.choices.some(function (c) { return !c; })) return editError('ใส่ตัวเลือกให้ครบทั้ง ก ข ค ง');
+    if (v.answer < 0) return editError('เลือกข้อที่ถูกโดยแตะวงกลมหน้าตัวเลือก');
+    var dup = exam.questions.some(function (x) { return x !== q && x.question.trim() === v.question; });
+    if (dup) return editError('ชุดนี้มีคำถามนี้อยู่แล้ว ลองเปลี่ยนข้อความคำถาม');
+    if (!lsGet(KEY_STORE)) return editError('ยังไม่ได้ใส่รหัสครูในเครื่องนี้ ไปที่ตั้งค่าแล้วกรอกรหัสครูก่อน');
+
+    var body;
+    if (q) {
+      var tooOld = needsVersion(SCRIPT_VERSION);
+      if (tooOld) return editError(tooOld);
+      body = { action: 'updateQuestion', row: q.sheetRow, expect: q.question, fields: editFields(v) };
+    } else {
+      var record = editFields(v);
+      record['ชุดข้อสอบ'] = exam.title;
+      body = { action: 'importExams', records: [record] };
+    }
+    ed.busy = 'save';
+    ed.msg = null;
+    renderKeepEdit();
+    postScript(body).then(function (reply) {
+      var problem = replyProblem(reply);
+      if (problem) return editError(problem);
+      if (!q && !reply.added) return editError('บันทึกไม่ได้ อาจมีคำถามนี้ในชุดอยู่แล้ว');
+      reloadAfterEdit(q ? 'บันทึกข้อที่แก้แล้ว นักเรียนจะเห็นเมื่อเปิดเว็บครั้งถัดไป' : 'เพิ่มข้อใหม่แล้ว นักเรียนจะเห็นเมื่อเปิดเว็บครั้งถัดไป');
+    }).catch(function () {
+      editError('ส่งข้อมูลไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง');
+    });
+  }
+
+  function deleteEdit() {
+    var ed = state.edit;
+    var exam = examById(ed.examId);
+    var q = exam && exam.questions.find(function (x) { return x.id === ed.qid; });
+    if (!q || ed.busy) return;
+    var tooOld = needsVersion(SCRIPT_VERSION);
+    if (tooOld) return editError(tooOld);
+    if (!window.confirm('ลบข้อนี้ออกจากชุด "' + exam.title + '" ใช่ไหม?\n\n' + q.question + '\n\nลบแล้วจะหายจากสเปรดชีตด้วย')) return;
+    ed.busy = 'delete';
+    ed.msg = null;
+    renderKeepEdit();
+    postScript({ action: 'deleteQuestion', row: q.sheetRow, expect: q.question }).then(function (reply) {
+      var problem = replyProblem(reply);
+      if (problem) return editError(problem);
+      reloadAfterEdit('ลบข้อนั้นแล้ว');
+    }).catch(function () {
+      editError('ส่งข้อมูลไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง');
+    });
+  }
+
+  // Shrinks big phone photos before upload so they load fast on students' slow connections.
+  function shrinkImage(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var scale = Math.min(1, 1200 / Math.max(img.width, img.height));
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('bad image')); };
+      img.src = url;
+    });
+  }
+
+  function uploadEditImage(file) {
+    if (!file) return;
+    var msg = $('edImageMsg');
+    function say(kind, text) { msg.hidden = false; msg.className = 'msg' + (kind ? ' ' + kind : ''); msg.textContent = text; }
+    var tooOld = needsVersion(SCRIPT_VERSION);
+    if (tooOld) { say('bad', tooOld); return; }
+    if (!/^image\//.test(file.type)) { say('bad', 'ไฟล์นี้ไม่ใช่รูปภาพ ลองเลือกไฟล์ .jpg หรือ .png'); return; }
+    say('', 'กำลังอัปโหลดรูป...');
+    var save = document.querySelector('[data-action="save-q"]');
+    if (save) save.disabled = true;
+    shrinkImage(file).then(function (base64) {
+      return postScript({ action: 'uploadImage', name: file.name.replace(/\.[^.]+$/, '') + '.jpg', mimeType: 'image/jpeg', base64: base64 });
+    }).then(function (reply) {
+      if (reply && reply.error === 'unauthorized') throw new Error(replyProblem(reply));
+      if (!reply || !reply.ok || !reply.url) throw new Error('สคริปต์ยังอัปโหลดรูปไม่ได้ ตรวจว่าอัปเดตเป็นเวอร์ชัน ' + SCRIPT_VERSION + ' และกดอนุญาตให้เข้าถึง Google Drive แล้ว');
+      setEditImage(reply.url);
+      say('ok', 'อัปโหลดรูปแล้ว กด "บันทึก" เพื่อใช้รูปนี้');
+    }).catch(function (err) {
+      say('bad', err && err.message && err.message !== 'bad image' && err.message.indexOf('fetch') < 0 ? err.message : 'อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง หรือใช้รูปขนาดเล็กลง');
+    }).then(function () {
+      if (save) save.disabled = false;
+      $('edImageFile').value = '';
+    });
   }
 
   var BLOOM_ORDER = ['ความจำ', 'ความเข้าใจ', 'ประยุกต์ใช้', 'วิเคราะห์', 'ประเมินค่า', 'สร้างสรรค์'];
@@ -1314,8 +1572,13 @@
     else if (a === 'open-student') { state.studentKey = t.dataset.key; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
     else if (a === 'close-student') { state.studentKey = null; render(); }
     else if (a === 'pick-analysis') { state.analysisExamId = t.dataset.exam; render(); }
-    else if (a === 'open-bank') { state.bankExamId = t.dataset.exam; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-    else if (a === 'close-bank') { state.bankExamId = null; render(); }
+    else if (a === 'open-bank') { state.bankExamId = t.dataset.exam; state.edit = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    else if (a === 'close-bank') { state.bankExamId = null; state.edit = null; render(); }
+    else if (a === 'edit-q') startEdit(t.dataset.qid);
+    else if (a === 'cancel-edit') { state.edit = null; render(); }
+    else if (a === 'save-q') saveEdit();
+    else if (a === 'delete-q') deleteEdit();
+    else if (a === 'remove-image') { setEditImage(''); $('edImageMsg').hidden = true; }
     else if (a === 'theme') { Theme.set(t.dataset.theme); render(); }
     else if (a === 'print') window.print();
     else if (a === 'copy-script') copyScript();
@@ -1351,6 +1614,7 @@
   }
 
   function onSubmit(e) {
+    if (e.target.id === 'editForm') { e.preventDefault(); return; }
     if (e.target.id === 'keyForm') {
       e.preventDefault();
       var key = $('keyInput').value.trim();
@@ -1419,6 +1683,7 @@
     document.addEventListener('submit', onSubmit);
     document.addEventListener('change', function (e) {
       if (e.target.id === 'importFile') readImportFile(e.target.files[0]);
+      if (e.target.id === 'edImageFile') uploadEditImage(e.target.files[0]);
       if (e.target.dataset.pick) {
         state.pick[e.target.dataset.pick] = e.target.value;
         if (e.target.dataset.rerender) {
