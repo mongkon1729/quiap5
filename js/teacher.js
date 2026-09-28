@@ -406,7 +406,7 @@
     var sub = state.loadedAt ? 'อัปเดต ' + whenText(state.loadedAt) : '';
     var html = head('ภาพรวมห้องเรียน', sub, refreshBtn()) + teacherBanner();
 
-    if (!state.rows.length) return html + noDataPanel();
+    if (!state.rows.length) return html + subjectCards() + noDataPanel();
 
     html += '<div class="stats block">' +
       stat('var(--yellow)', 'นักเรียน', s.students.length, 'คนที่ทำข้อสอบแล้ว') +
@@ -415,31 +415,11 @@
       stat('var(--pink)', '7 วันล่าสุด', s.thisWeek, 'ครั้ง') +
       '</div>';
 
-    var examRows = state.exams.map(function (e) {
-      var es = s.exams[e.id];
-      var avg = es.completed ? Math.round(es.sumPct / es.completed) : null;
-      return '<div class="row-item"><div class="row-top"><strong>' + esc(e.title) + '</strong>' +
-        '<span class="num">' + (avg == null ? 'ยังไม่มีคนทำครบ' : avg + '% • ' + es.completed + ' ครั้ง') + '</span></div>' +
-        bar(avg || 0) + '</div>';
-    }).join('');
-
-    var hard = s.items.filter(function (it) { return it.wrongRate > 0; }).slice(0, 5).map(function (it) {
-      return '<div class="row-item"><div class="row-top"><strong>' + esc(it.exam.title) + ' ข้อ ' + it.no + '</strong>' +
-        '<span class="num">ผิด ' + it.wrongRate + '%</span></div>' +
-        '<div style="font-size:14px;color:var(--ink-soft)">' + esc(it.q.question) + '</div>' +
-        bar(it.wrongRate, 'low') + '</div>';
-    }).join('');
-
+    html += subjectCards();
     html += prePostBlock();
 
     var needHelp = s.students.filter(function (st) { return st.avg != null && st.avg < 50; });
 
-    html += '<div class="two-col block">' +
-      '<div class="panel card"><div class="block-head"><h2>คะแนนเฉลี่ยรายชุด</h2></div><div class="rows">' + examRows + '</div></div>' +
-      '<div class="panel card"><div class="block-head"><h2>ข้อที่ผิดบ่อย</h2>' +
-        '<button type="button" class="btn btn-ghost btn-sm" data-action="nav" data-view="analysis">ดูทั้งหมด</button></div>' +
-        '<div class="rows">' + (hard || '<p class="empty-note">ยังไม่มีข้อมูล</p>') + '</div></div>' +
-      '</div>';
 
     html += '<div class="block"><div class="block-head"><h2>นักเรียนที่ควรช่วยเป็นพิเศษ</h2><span class="muted">คะแนนเฉลี่ยต่ำกว่า 50%</span></div>' +
       (needHelp.length
@@ -449,9 +429,33 @@
     return html;
   }
 
+  // one card per subject, like the students' home page; average = completed attempts in that subject
+  function subjectCards() {
+    var ES = ExamSource;
+    var s = state.stats;
+    var groups = ES.groupBy(state.exams, function (e) { return ES.subjectOf(e).name; });
+    if (!groups.length) return '';
+    return '<div class="block"><div class="block-head"><h2>รายวิชา</h2><span class="muted">กดเพื่อดูบทและชุดข้อสอบ</span></div>' +
+      '<div class="nav-grid">' + groups.map(function (g, i) {
+        var done = 0, sum = 0;
+        g.items.forEach(function (e) {
+          var es = s && s.exams[e.id];
+          if (es && es.completed) { done += es.completed; sum += es.sumPct; }
+        });
+        var avg = done ? Math.round(sum / done) : null;
+        var units = ES.groupBy(g.items, ES.unitOf).length;
+        return ES.navCardHtml({
+          attrs: 'data-action="overview-subject" data-s="' + esc(g.key) + '"',
+          theme: ES.subjectOf(g.items[0]), title: g.key, big: true, delay: i * 60,
+          sub: units + ' บท • ' + g.items.length + ' ชุด' + (avg == null ? '' : ' • เฉลี่ย ' + avg + '%'),
+          pct: avg
+        });
+      }).join('') + '</div></div>';
+  }
+
   function teacherBanner() {
     return '<div class="hero hero-banner"><div class="hero-illus hero-illus-left">' + Art.scene('books', 'bar_chart', 'pencil') + '</div>' +
-      '<div class="hero-text"><h1>สวัสดีคุณครู</h1><p>ดูผลของนักเรียน วิเคราะห์ข้อสอบ และเพิ่มชุดใหม่ได้จากที่นี่</p>' +
+      '<div class="hero-text"><h1>สวัสดีคุณครู</h1><p>ดูผลนักเรียนและจัดการข้อสอบได้ที่นี่</p>' +
       '<button type="button" class="btn btn-hero" data-action="nav" data-view="import">เพิ่มข้อสอบชุดใหม่</button></div>' +
       '<div class="hero-illus hero-illus-right">' + Art.scene('school', 'graduation_cap', 'sparkles') + '</div></div>';
   }
@@ -465,8 +469,8 @@
     return '<div class="panel card" style="text-align:center">' +
       '<p class="empty-note" style="padding-bottom:8px">' +
       (SHEETS_URL
-        ? 'ยังไม่มีนักเรียนส่งผลสอบเข้ามา เมื่อมีคนทำข้อสอบเสร็จ ผลจะขึ้นที่นี่'
-        : 'ยังไม่ได้เชื่อมกับ Google Sheets คะแนนของนักเรียนจึงยังไม่ส่งมาที่หน้านี้') +
+        ? 'ยังไม่มีผลสอบ นักเรียนทำเสร็จแล้วจะขึ้นที่นี่'
+        : 'ยังไม่ได้เชื่อม Google Sheets คะแนนจึงยังไม่เข้ามา') +
       '</p><div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
       (SHEETS_URL ? '' : '<button type="button" class="btn btn-primary btn-sm" data-action="nav" data-view="settings">วิธีเชื่อม Google Sheets</button>') +
       '<button type="button" class="btn btn-sm" data-action="demo-on">ดูตัวอย่างข้อมูล</button></div></div>';
@@ -793,7 +797,7 @@
   function sheetPanel() {
     if (!SHEETS_URL) {
       return '<div class="panel card block"><div class="block-head"><h2>เพิ่มข้อสอบเอง</h2></div>' +
-        '<p class="note" style="margin-top:0">เชื่อม Google Sheets ในเมนูตั้งค่าก่อน แล้วครูจะเพิ่มข้อสอบใหม่ได้เองจากแท็บ "ข้อสอบ" ในสเปรดชีต</p>' +
+        '<p class="note" style="margin-top:0">เชื่อม Google Sheets ในเมนูตั้งค่าก่อน แล้วเพิ่มข้อสอบได้จากแท็บ "ข้อสอบ" ในสเปรดชีต</p>' +
         '<div style="margin-top:12px"><button type="button" class="btn btn-sm" data-action="nav" data-view="settings">ไปที่ตั้งค่า</button></div></div>';
     }
     var sh = state.sheet || { sheetStatus: 'loading', sheetExams: [], issues: [] };
@@ -809,9 +813,9 @@
       '<div class="status-line">' + status + '<span>' + sh.sheetExams.length + ' ชุด • ' + nQ + ' ข้อ</span></div>';
 
     if (sh.sheetStatus === 'error') {
-      html += '<p class="note" style="margin-top:0">ถ้ายังไม่ได้อัปเดตสคริปต์เป็นเวอร์ชัน 5 ให้ทำตามขั้นตอนที่ 1 ด้านล่างก่อน</p>';
+      html += '<p class="note" style="margin-top:0">อัปเดตสคริปต์เป็นเวอร์ชัน ' + SCRIPT_VERSION + ' ก่อน (ขั้นตอนที่ 1 ด้านล่าง)</p>';
     } else if (sh.scriptVersion && sh.scriptVersion < SCRIPT_VERSION) {
-      html += '<p class="error-text" style="margin-top:4px">สคริปต์ Google ยังเป็นเวอร์ชัน ' + sh.scriptVersion + ' ให้อัปเดตเป็นเวอร์ชัน ' + SCRIPT_VERSION + ' (ขั้นตอนที่ 1 ด้านล่าง) เพื่อแก้ข้อสอบทีละข้อและอัปโหลดรูปจากหน้านี้ได้</p>';
+      html += '<p class="error-text" style="margin-top:4px">สคริปต์ Google ยังเป็นเวอร์ชัน ' + sh.scriptVersion + ' อัปเดตเป็นเวอร์ชัน ' + SCRIPT_VERSION + ' ได้ที่ขั้นตอนที่ 1 ด้านล่าง</p>';
     }
     if (sh.issues.length) {
       html += '<div class="error-text" style="margin-top:4px"><b>มี ' + sh.issues.length + ' แถวที่ยังไม่ขึ้นเว็บ</b> แก้ในสเปรดชีตแล้วกด "โหลดข้อสอบใหม่"' +
@@ -819,7 +823,7 @@
           return '<li>แถว ' + it.row + ': ' + esc(it.message) + '</li>';
         }).join('') + (sh.issues.length > 12 ? '<li>และอีก ' + (sh.issues.length - 12) + ' แถว</li>' : '') + '</ul></div>';
     } else if (sh.sheetStatus === 'fresh' && sh.sheetExams.length) {
-      html += '<p class="msg ok" style="margin-top:0">ทุกแถวถูกต้อง นักเรียนจะเห็นข้อสอบใหม่เมื่อเปิดเว็บครั้งถัดไป</p>';
+      html += '<p class="msg ok" style="margin-top:0">ทุกแถวถูกต้อง</p>';
     }
     return html + '</div>';
   }
@@ -831,24 +835,24 @@
       '<summary><h2>วิธีเพิ่มข้อสอบผ่าน Google Sheets</h2></summary>' +
       '<ol class="steps" style="margin-top:14px">' +
       '<li><b>อัปเดตสคริปต์เป็นเวอร์ชัน ' + SCRIPT_VERSION + ' (ทำครั้งเดียว)</b><br>เปิดสเปรดชีต → ส่วนขยาย → Apps Script → <b>จดรหัสในบรรทัด TEACHER_KEY ไว้ก่อน</b> → ลบโค้ดเดิมทั้งหมด → วางโค้ดใหม่ → ใส่รหัสเดิมกลับใน TEACHER_KEY → กดบันทึก<br>' +
-        'จากนั้นกด ทำให้ใช้งานได้ → <b>จัดการการทำให้ใช้งานได้</b> → กดรูปดินสอ → ช่องเวอร์ชันเลือก <b>เวอร์ชันใหม่</b> → กดทำให้ใช้งานได้ ถ้า Google ขออนุญาตเข้าถึง Google Drive ให้กดอนุญาต (ใช้เก็บรูปที่ครูอัปโหลด) ลิงก์เดิมใช้ต่อได้ ไม่ต้องแก้ config.js' +
+        'จากนั้นกด ทำให้ใช้งานได้ → <b>จัดการการทำให้ใช้งานได้</b> → กดรูปดินสอ → ช่องเวอร์ชันเลือก <b>เวอร์ชันใหม่</b> → กดทำให้ใช้งานได้ ถ้า Google ขอสิทธิ์ Google Drive ให้กดอนุญาต (ใช้เก็บรูป) ลิงก์เดิมใช้ต่อได้' +
         '<div style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" data-action="copy-script">คัดลอกสคริปต์เวอร์ชัน ' + SCRIPT_VERSION + '</button> <span id="copyMsg" class="msg ok" hidden>คัดลอกแล้ว</span></div>' +
         '<pre class="code-box" id="scriptBox" hidden></pre></li>' +
       '<li>กดปุ่ม <b>โหลดข้อสอบใหม่</b> ด้านบนหนึ่งครั้ง สเปรดชีตจะมีแท็บใหม่ชื่อ <b>ข้อสอบ</b> พร้อมหัวตาราง</li>' +
       '<li>กรอกข้อสอบในแท็บ <b>ข้อสอบ</b> <b>1 แถว = 1 ข้อ</b><table class="plain" style="margin-top:8px"><tbody>' +
-        '<tr><td><b>ชุดข้อสอบ</b></td><td>ชื่อชุด พิมพ์ให้เหมือนกันทุกแถวในชุดเดียวกัน (หรือพิมพ์แค่แถวแรก แถวถัดไปเว้นว่างได้)</td></tr>' +
+        '<tr><td><b>ชุดข้อสอบ</b></td><td>ชื่อชุด พิมพ์แค่แถวแรกของชุดก็ได้</td></tr>' +
         '<tr><td><b>ข้อมูลของชุด</b><br>วิชา (รายวิชา), รหัสวิชา, ระดับชั้น, กลุ่มสาระ, สาระ, มาตรฐาน, หน่วยการเรียนรู้, เรื่อง, ประเภทการสอบ, ความยากของชุด, เวลา(นาที)</td>' +
-          '<td>ใส่แค่แถวแรกของชุดก็พอ ถ้าใส่ตัวชี้วัดรายข้อไว้ ระบบจะเติมระดับชั้น กลุ่มสาระ สาระ และมาตรฐานให้เอง ประเภทการสอบใช้คำว่า ก่อนเรียน ระหว่างเรียน หลังเรียน กลางภาค ปลายภาค หรือ ฝึกทำ</td></tr>' +
-        '<tr><td><b>หัวข้อ / ตัวชี้วัด / Bloom / ความยาก</b></td><td>รายข้อ ไม่บังคับ ความยากใช้คำว่า ง่าย ปานกลาง หรือ ยาก ใส่แล้วหน้าวิเคราะห์ข้อสอบจะแยกผลให้</td></tr>' +
+          '<td>ใส่แถวแรกของชุดพอ ถ้ามีตัวชี้วัดรายข้อ ระบบเติมชั้น กลุ่มสาระ สาระ และมาตรฐานให้ ประเภทการสอบ: ก่อนเรียน ระหว่างเรียน หลังเรียน กลางภาค ปลายภาค หรือ ฝึกทำ</td></tr>' +
+        '<tr><td><b>หัวข้อ / ตัวชี้วัด / Bloom / ความยาก</b></td><td>ไม่บังคับ ความยาก: ง่าย ปานกลาง หรือ ยาก</td></tr>' +
         '<tr><td><b>คำถาม, ก, ข, ค, ง</b></td><td>จำเป็นต้องใส่ทั้งหมด</td></tr>' +
         '<tr><td><b>คำตอบ</b></td><td>พิมพ์ ก ข ค หรือ ง</td></tr>' +
         '<tr><td><b>คำอธิบาย</b></td><td>เหตุผลที่นักเรียนจะเห็นหลังตอบ</td></tr>' +
-        '<tr><td><b>รูปภาพ</b></td><td>ไม่บังคับ ใส่ลิงก์รูปที่เปิดดูได้โดยตรง หรือกดแก้ไขข้อนั้นในหน้าคลังข้อสอบแล้วอัปโหลดรูปจากเครื่อง</td></tr>' +
+        '<tr><td><b>รูปภาพ</b></td><td>ไม่บังคับ ใส่ลิงก์รูป หรืออัปโหลดจากปุ่มแก้ไขในคลังข้อสอบ</td></tr>' +
         '</tbody></table></li>' +
-      '<li><b>มีข้อสอบใน Excel อยู่แล้ว:</b> เรียงคอลัมน์ใน Excel ให้ตรงกับหัวตาราง แล้วคัดลอกทั้งหมดไปวางในแท็บข้อสอบ ตั้งแต่แถวที่ 2' +
+      '<li><b>มีข้อสอบใน Excel อยู่แล้ว:</b> เรียงคอลัมน์ให้ตรงหัวตาราง แล้ววางในแท็บข้อสอบตั้งแต่แถวที่ 2' +
         '<div style="margin-top:10px"><button type="button" class="btn btn-sm" data-action="copy-header">คัดลอกหัวตารางไปวางใน Excel</button> <span id="headerMsg" class="msg ok" hidden>คัดลอกแล้ว</span></div></li>' +
       '<li>กลับมาหน้านี้ กด <b>โหลดข้อสอบใหม่</b> ถ้ามีแถวที่กรอกผิด ระบบจะบอกเลขแถวให้แก้</li>' +
-      '</ol><p class="note">ถ้าแก้ข้อความในช่องคำถาม ระบบจะนับข้อนั้นเป็นข้อใหม่ ประวัติ "ข้อที่เคยตอบผิด" ของข้อนั้นจะเริ่มนับใหม่ ส่วนการแก้ตัวเลือก คำตอบ หรือคำอธิบาย ไม่กระทบประวัติ</p></details>';
+      '</ol><p class="note">ถ้าแก้ข้อความในช่องคำถาม ระบบจะนับข้อนั้นเป็นข้อใหม่ ประวัติ "ข้อที่เคยตอบผิด" ของข้อนั้นจะเริ่มใหม่ แก้ตัวเลือก เฉลย หรือคำอธิบายไม่มีผล</p></details>';
   }
 
   function copyText(text, msgId) {
@@ -872,7 +876,7 @@
       '<button type="button" class="btn btn-sm' + (exam.status === 'draft' ? '' : ' btn-primary') + '" data-action="print">พิมพ์เฉลย</button></div>');
     if (exam.status === 'draft') {
       html += '<div class="status-note no-print"><img src="img/3d/memo.png" alt="" /><div><b>ชุดนี้ยังเป็นร่าง นักเรียนยังไม่เห็น</b>' +
-        '<span>ตรวจคำถาม เฉลย และคำอธิบายให้เรียบร้อย แก้ข้อที่ผิดได้ด้วยปุ่ม "แก้ไขข้อนี้" แล้วกด "เผยแพร่ให้นักเรียน"</span></div></div>';
+        '<span>ตรวจเฉลยก่อน แก้ได้ด้วยปุ่ม "แก้ไขข้อนี้" แล้วกด "เผยแพร่ให้นักเรียน"</span></div></div>';
     }
     html += '<div class="paper-head card"><div class="tags">' + typePill(exam.examType) + diffPill(exam.difficulty, 'ความยาก ') +
       '<span class="pill">' + exam.questions.length + ' ข้อ</span><span class="pill">' + (exam.timeLimitMinutes || 15) + ' นาที</span></div>' +
@@ -881,7 +885,7 @@
     var editable = exam.source === 'sheets' && !!SHEETS_URL;
     var ed = state.edit && state.edit.examId === exam.id ? state.edit : null;
     if (!editable) {
-      html += '<p class="note no-print">ชุดนี้มาจากไฟล์ในเว็บ (data/questions.json) แก้ทีละข้อจากหน้านี้ไม่ได้ ถ้าอยากแก้ในหน้านี้ ให้นำเข้าชุดนี้ไปไว้ใน Google Sheets ก่อน</p>';
+      html += '<p class="note no-print">ชุดนี้อยู่ในไฟล์เว็บ แก้จากหน้านี้ไม่ได้ ถ้าจะแก้ ให้นำเข้าไปไว้ใน Google Sheets ก่อน</p>';
     }
     if (ed && ed.msg && ed.msg.kind === 'ok') html += '<p class="msg ok no-print" id="editDone">' + esc(ed.msg.text) + '</p>';
     html += '<div class="q-list">' + exam.questions.map(function (q, qi) {
@@ -1017,9 +1021,9 @@
   }
 
   function replyProblem(reply) {
-    if (reply && reply.error === 'unauthorized') return 'รหัสครูในเครื่องนี้ไม่ตรงกับ TEACHER_KEY ในสคริปต์ ไปที่ ตั้งค่า แล้วกรอกรหัสครูใหม่';
+    if (reply && reply.error === 'unauthorized') return 'รหัสครูไม่ตรงกับ TEACHER_KEY ในสคริปต์ กรอกใหม่ในเมนูตั้งค่า';
     if (reply && reply.error === 'moved') return 'ข้อนี้ในสเปรดชีตถูกแก้หรือย้ายไปแล้ว กด "ยกเลิก" แล้วกด "โหลดข้อสอบใหม่" ในหน้าคลังข้อสอบ จากนั้นลองแก้อีกครั้ง';
-    if (!reply || !reply.ok) return 'สคริปต์ Google ยังไม่รองรับการแก้ทีละข้อ ให้อัปเดตสคริปต์เป็นเวอร์ชัน ' + SCRIPT_VERSION + ' ก่อน';
+    if (!reply || !reply.ok) return 'สคริปต์ Google ยังเก่า อัปเดตเป็นเวอร์ชัน ' + SCRIPT_VERSION + ' ก่อน';
     return '';
   }
 
@@ -1056,7 +1060,7 @@
     if (v.answer < 0) return editError('เลือกข้อที่ถูกโดยแตะวงกลมหน้าตัวเลือก');
     var dup = exam.questions.some(function (x) { return x !== q && x.question.trim() === v.question; });
     if (dup) return editError('ชุดนี้มีคำถามนี้อยู่แล้ว ลองเปลี่ยนข้อความคำถาม');
-    if (!lsGet(KEY_STORE)) return editError('ยังไม่ได้ใส่รหัสครูในเครื่องนี้ ไปที่ตั้งค่าแล้วกรอกรหัสครูก่อน');
+    if (!lsGet(KEY_STORE)) return editError('ยังไม่ได้ใส่รหัสครู กรอกในเมนูตั้งค่าก่อน');
 
     var body;
     if (q) {
@@ -1075,7 +1079,7 @@
       var problem = replyProblem(reply);
       if (problem) return editError(problem);
       if (!q && !reply.added) return editError('บันทึกไม่ได้ อาจมีคำถามนี้ในชุดอยู่แล้ว');
-      reloadAfterEdit(q ? 'บันทึกข้อที่แก้แล้ว นักเรียนจะเห็นเมื่อเปิดเว็บครั้งถัดไป' : 'เพิ่มข้อใหม่แล้ว นักเรียนจะเห็นเมื่อเปิดเว็บครั้งถัดไป');
+      reloadAfterEdit(q ? 'บันทึกแล้ว' : 'เพิ่มข้อใหม่แล้ว');
     }).catch(function () {
       editError('ส่งข้อมูลไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง');
     });
@@ -1149,7 +1153,7 @@
       setEditImage(reply.url);
       say('ok', 'อัปโหลดรูปแล้ว กด "บันทึก" เพื่อใช้รูปนี้');
     }).catch(function (err) {
-      say('bad', err && err.message && err.message !== 'bad image' && err.message.indexOf('fetch') < 0 ? err.message : 'อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง หรือใช้รูปขนาดเล็กลง');
+      say('bad', err && err.message && err.message !== 'bad image' && err.message.indexOf('fetch') < 0 ? err.message : 'อัปโหลดไม่สำเร็จ ลองใหม่ หรือใช้รูปที่เล็กลง');
     }).then(function () {
       if (save) save.disabled = false;
       $('edImageFile').value = '';
@@ -1272,7 +1276,7 @@
         '<label class="pick-field"><span>รหัสวิชา</span><input type="text" ' + attrs('courseCode') + ' value="' + esc(e.courseCode || '') + '" placeholder="เช่น ค15101" /></label>' +
         '<label class="pick-field"><span>เวลา (นาที)</span><input type="number" min="1" ' + attrs('minutes') + ' value="' + esc(e.minutes || '') + '" placeholder="ว่างไว้ = คิดให้อัตโนมัติ" /></label>' +
       '</div>' +
-      (units.length || lessons.length ? '<p class="note" style="margin:0">พิมพ์ช่องบทหรือเรื่องแล้วจะมีชื่อเดิมในวิชานี้ให้เลือก ใช้ชื่อเดียวกันเพื่อรวมไว้ในบทเดียวกัน</p>' : '') +
+      (units.length || lessons.length ? '<p class="note" style="margin:0">พิมพ์ในช่องบทหรือเรื่องแล้วจะมีชื่อเดิมให้เลือก</p>' : '') +
       '</div>';
   }
 
@@ -1283,25 +1287,25 @@
   }
 
   function renderImport() {
-    var html = head('นำเข้าข้อสอบ', 'ให้ AI ออกข้อสอบ แล้วนำไฟล์มาสร้างชุดข้อสอบในเว็บได้ทันที');
+    var html = head('นำเข้าข้อสอบ', 'ให้ AI ออกข้อสอบ แล้วนำมาใส่เว็บ');
 
     if (!SHEETS_URL) {
-      return html + '<div class="panel card"><p class="empty-note">ต้องเชื่อม Google Sheets ก่อน ข้อสอบที่นำเข้าจะไปเก็บในสเปรดชีตของครู' +
+      return html + '<div class="panel card"><p class="empty-note">ต้องเชื่อม Google Sheets ก่อน ข้อสอบจะเก็บในสเปรดชีตของครู' +
         '</p><div style="text-align:center"><button type="button" class="btn btn-primary btn-sm" data-action="nav" data-view="settings">ไปที่ตั้งค่า</button></div></div>';
     }
 
     html += '<div class="import-steps">' +
       '<div class="panel card"><div class="step-no">1</div><h2>ให้ AI ออกข้อสอบ</h2>' +
         (curriculum.list.length
-          ? '<p class="note" style="margin-top:0">เลือกตัวชี้วัดจากหลักสูตรด้านล่าง ระบบจะใส่ข้อความตัวชี้วัดตามหลักสูตรลงในคำสั่งให้ แล้วคัดลอกไปวางใน ChatGPT, Gemini หรือ Claude</p>'
-          : '<p class="note" style="margin-top:0">คัดลอกคำสั่งไปวางใน ChatGPT, Gemini หรือ Claude แก้ส่วนที่อยู่ใน [ ] เป็นวิชา เรื่อง และจำนวนข้อที่ต้องการ</p>') +
+          ? '<p class="note" style="margin-top:0">เลือกตัวชี้วัดด้านล่าง แล้วคัดลอกคำสั่งไปวางใน ChatGPT, Gemini หรือ Claude</p>'
+          : '<p class="note" style="margin-top:0">คัดลอกคำสั่งไปวางใน ChatGPT, Gemini หรือ Claude แล้วแก้ส่วนใน [ ]</p>') +
         indicatorPicker() +
         '<div class="btn-row" style="margin-top:14px"><button type="button" class="btn btn-primary btn-sm" data-action="copy-prompt" id="promptBtn">' + promptButtonLabel() + '</button>' +
         '<button type="button" class="btn btn-sm" data-action="download-example">ไฟล์ตัวอย่าง .txt</button></div>' +
         '<p id="promptMsg" class="msg ok" hidden>คัดลอกแล้ว นำไปวางในแชต AI ได้เลย</p></div>' +
       '<div class="panel card"><div class="step-no">2</div><h2>เลือกไฟล์ หรือวางข้อความ</h2>' +
         '<label id="dropZone" class="dropzone" for="importFile"><strong>ลากไฟล์มาวางตรงนี้ หรือกดเพื่อเลือกไฟล์</strong>' +
-        '<span>รับไฟล์ .txt .csv .json (บันทึกคำตอบของ AI เป็นไฟล์ .txt ได้เลย)</span></label>' +
+        '<span>ไฟล์ .txt .csv หรือ .json</span></label>' +
         '<input id="importFile" type="file" accept=".txt,.md,.csv,.tsv,.json,text/plain" hidden />' +
         '<textarea id="importText" class="import-text" placeholder="หรือคัดลอกคำตอบของ AI มาวางตรงนี้">' + esc(state.pasteText || '') + '</textarea>' +
         '<button type="button" class="btn btn-secondary btn-sm" data-action="parse-import" style="margin-top:10px">ตรวจข้อสอบ</button></div>' +
@@ -1411,7 +1415,7 @@
       '<p class="note" style="margin-top:0">จาก ' + esc(d.filename) + '</p>';
 
     if (!d.exams.length && !d.issues.length) {
-      html += '<p class="error-text">ไม่พบข้อสอบในไฟล์นี้ ลองดูว่ารูปแบบตรงกับไฟล์ตัวอย่างไหม</p>';
+      html += '<p class="error-text">ไม่พบข้อสอบในไฟล์นี้ เทียบรูปแบบกับไฟล์ตัวอย่างดู</p>';
     }
 
     html += d.exams.map(function (e, di) {
@@ -1452,7 +1456,7 @@
       '<button type="button" class="btn btn-primary" data-action="commit-import"' + (canSend ? '' : ' disabled') + '>' +
       (state.importing ? 'กำลังเพิ่มเข้าเว็บ...' : 'เพิ่มเข้าเว็บ ' + d.newCount + ' ข้อ') + '</button>' +
       '<button type="button" class="btn btn-ghost btn-sm" data-action="clear-import">ยกเลิก</button></div>' +
-      '<p class="note">กดดูรายละเอียดแต่ละชุดเพื่อตรวจคำตอบก่อนได้ ข้อสอบจะไปอยู่ในแท็บ "ข้อสอบ" ของ Google Sheets ถ้าต้องแก้ทีหลัง แก้ในสเปรดชีตได้เลย</p></div>';
+      '<p class="note">กดดูแต่ละชุดเพื่อตรวจก่อนได้ ข้อสอบจะไปอยู่ในแท็บ "ข้อสอบ" ของ Google Sheets ถ้าต้องแก้ทีหลัง แก้ในสเปรดชีตได้เลย</p></div>';
     return html;
   }
 
@@ -1485,7 +1489,7 @@
     var key = lsGet(KEY_STORE);
     if (d) flagDraft(d);
     if (!d || !d.newCount) return;
-    if (!key) { state.importMsg = { kind: 'bad', text: 'ยังไม่ได้ใส่รหัสครูในเครื่องนี้ ไปที่ตั้งค่าแล้วกรอกรหัสครูก่อน' }; render(); return; }
+    if (!key) { state.importMsg = { kind: 'bad', text: 'ยังไม่ได้ใส่รหัสครู กรอกในเมนูตั้งค่าก่อน' }; render(); return; }
 
     var exams = d.exams.map(function (e) {
       var copy = {};
@@ -1509,7 +1513,7 @@
 
     var version = state.sheet && state.sheet.scriptVersion;
     if (version && version < 4) {
-      fail('สคริปต์ Google ยังเป็นเวอร์ชัน ' + version + ' ต้องอัปเดตเป็นเวอร์ชัน 4 ก่อน จึงจะบันทึกข้อมูลหลักสูตร (ระดับชั้น หน่วย ความยาก ฯลฯ) ได้ ดูวิธีที่ คลังข้อสอบ > วิธีเพิ่มข้อสอบ');
+      fail('สคริปต์ Google ยังเป็นเวอร์ชัน ' + version + ' อัปเดตสคริปต์ก่อน ดูวิธีที่ คลังข้อสอบ > วิธีเพิ่มข้อสอบ');
       return;
     }
 
@@ -1521,11 +1525,11 @@
       return res.json();
     }).then(function (reply) {
       if (reply && reply.error === 'unauthorized') {
-        fail('รหัสครูในเครื่องนี้ไม่ตรงกับ TEACHER_KEY ในสคริปต์ ไปที่ ตั้งค่า แล้วกรอกรหัสครูใหม่ (ต้องตรงกับในสคริปต์ทุกตัวอักษร)');
+        fail('รหัสครูไม่ตรงกับ TEACHER_KEY ในสคริปต์ กรอกใหม่ในเมนูตั้งค่า');
         return;
       }
       if (!reply || !reply.ok || reply.added === undefined) {
-        fail('ลิงก์ใน js/config.js ยังเป็นสคริปต์เวอร์ชันเก่า ตรวจว่า Push ลิงก์ใหม่แล้ว จากนั้นกด Ctrl+F5 แล้วลองอีกครั้ง');
+        fail('สคริปต์ยังเป็นเวอร์ชันเก่า อัปเดตแล้วกด Ctrl+F5 แล้วลองใหม่');
         return;
       }
       return new Promise(function (resolve) { setTimeout(resolve, 800); }).then(verifyImport);
@@ -1548,7 +1552,7 @@
         if (data.sheetStatus === 'fresh' && found === expected.length) {
           state.draft = null;
           state.pasteText = '';
-          state.importMsg = { kind: 'ok', text: 'เพิ่มแล้ว ' + found + ' ข้อ ชุดใหม่จะเป็น "ร่าง" ก่อน นักเรียนยังไม่เห็น ไปที่คลังข้อสอบเพื่อตรวจ แล้วกด "เผยแพร่ให้นักเรียน"' };
+          state.importMsg = { kind: 'ok', text: 'เพิ่มแล้ว ' + found + ' ข้อ เป็นร่างไว้ก่อน ตรวจในคลังข้อสอบแล้วกด "เผยแพร่ให้นักเรียน"' };
         } else if (found > 0) {
           state.importMsg = { kind: 'bad', text: 'เพิ่มได้ ' + found + ' จาก ' + expected.length + ' ข้อ ลองกดเพิ่มอีกครั้ง ข้อที่มีแล้วจะถูกข้ามให้เอง' };
           state.draft = buildDraft(d.text, d.filename);
@@ -1575,7 +1579,7 @@
       [['light', 'สว่าง', ICONS.sun], ['dark', 'มืด', ICONS.moon], ['auto', 'ตามเครื่อง', ICONS.auto]].map(function (t) {
         return '<button type="button" data-action="theme" data-theme="' + t[0] + '" aria-pressed="' + (current === t[0]) + '">' + t[2] + t[1] + '</button>';
       }).join('') + '</div>' +
-      '<p class="note">"ตามเครื่อง" จะสลับเองตามการตั้งค่าของคอมหรือมือถือ ธีมที่เลือกจำไว้เฉพาะเครื่องนี้ และใช้กับหน้านักเรียนบนเครื่องนี้ด้วย</p></div>';
+      '<p class="note">"ตามเครื่อง" จะสลับตามเครื่อง ค่าที่เลือกใช้เฉพาะเครื่องนี้</p></div>';
 
     html += '<div class="panel card block"><div class="block-head"><h2>Google Sheets</h2></div><div class="status-line"><strong>สถานะ</strong>' + status +
       (state.demo ? '<span class="pill pill-blue">กำลังดูข้อมูลตัวอย่าง</span>' : '') + '</div>';
@@ -1585,7 +1589,7 @@
         '<p id="keyMsg" class="msg" hidden></p>' +
         (key ? '<p class="note">เครื่องนี้จำรหัสครูไว้แล้ว ถ้าใช้เครื่องส่วนกลาง <button type="button" class="btn btn-ghost btn-sm" data-action="forget-key">ลืมรหัสบนเครื่องนี้</button></p>' : '');
     } else {
-      html += '<p class="note" style="margin-top:0">ทำตามขั้นตอนด้านล่างครั้งเดียว หลังจากนั้นคะแนนของนักเรียนทุกคนจะมาอยู่ที่หน้านี้</p>';
+      html += '<p class="note" style="margin-top:0">ทำตามขั้นตอนด้านล่างครั้งเดียว แล้วคะแนนนักเรียนจะเข้ามาที่หน้านี้</p>';
     }
     html += '</div>';
 
@@ -1598,11 +1602,11 @@
       '<li>กดปุ่ม <b>ทำให้ใช้งานได้ (Deploy) → การทำให้ใช้งานได้รายการใหม่ (New deployment)</b> กดรูปเฟืองเลือก <b>เว็บแอป (Web app)</b><br>ตั้ง "เรียกใช้ในฐานะ" เป็น <b>ฉัน (Me)</b> และ "ผู้ที่มีสิทธิ์เข้าถึง" เป็น <b>ทุกคน (Anyone)</b> (ต้องเป็น "ทุกคน" เฉยๆ ไม่ใช่ "ทุกคนที่มีบัญชี Google") แล้วกด Deploy และกดอนุญาตสิทธิ์ด้วยบัญชี Google ของครู</li>' +
       '<li>คัดลอก <b>URL ของเว็บแอป</b> (ขึ้นต้นด้วย <code>https://script.google.com/macros/s/</code>)</li>' +
       '<li>เปิดไฟล์ <code>js/config.js</code> ในโฟลเดอร์ quiap5 (คลิกขวา → Open with → Notepad) วาง URL ไว้ระหว่างเครื่องหมาย <code>\'\'</code> หลังคำว่า sheetsUrl แล้วบันทึก จากนั้น Commit และ Push ด้วย GitHub Desktop</li>' +
-      '<li>รอ 1-2 นาที เปิดหน้านี้ใหม่ แล้วกรอกรหัสครูที่ตั้งไว้ในขั้นตอนที่ 3</li>' +
-      '</ol><p class="note">รหัสครูอยู่ใน Google ของครูเท่านั้น ไม่อยู่ในเว็บ นักเรียนจึงเปิดดูคะแนนของเพื่อนไม่ได้ ส่วนเฉลยในคลังข้อสอบ เป็นข้อมูลเดียวกับที่อยู่ในเว็บอยู่แล้ว</p></div>';
+      '<li>รอ 1-2 นาที เปิดหน้านี้ใหม่ แล้วกรอกรหัสครูจากขั้นตอนที่ 3</li>' +
+      '</ol><p class="note">รหัสครูเก็บใน Google ของครู ไม่อยู่ในเว็บ นักเรียนจึงดูคะแนนเพื่อนไม่ได้</p></div>';
 
     html += '<div class="panel card"><div class="block-head"><h2>ข้อมูลตัวอย่าง</h2></div>' +
-      '<p class="note" style="margin-top:0">ลองดูว่าแดชบอร์ดจะหน้าตาเป็นอย่างไรเมื่อมีนักเรียนทำข้อสอบ (ข้อมูลสมมุติ ไม่ได้บันทึกที่ไหน)</p>' +
+      '<p class="note" style="margin-top:0">ดูตัวอย่างหน้านี้เมื่อมีผลสอบ (ข้อมูลสมมุติ)</p>' +
       '<div style="margin-top:12px">' + (state.demo
         ? '<button type="button" class="btn btn-sm" data-action="demo-off">ปิดข้อมูลตัวอย่าง</button>'
         : '<button type="button" class="btn btn-sm" data-action="demo-on">เปิดข้อมูลตัวอย่าง</button>') + '</div></div>';
@@ -1662,22 +1666,44 @@
         '<button type="button" class="icon-btn" data-action="mg-move" data-kind="' + kind + '" data-i="' + idx + '"' + (extra || '') + ' data-dir="-1" aria-label="เลื่อนขึ้น"' + (idx === 0 ? ' disabled' : '') + '>↑</button>' +
         '<button type="button" class="icon-btn" data-action="mg-move" data-kind="' + kind + '" data-i="' + idx + '"' + (extra || '') + ' data-dir="1" aria-label="เลื่อนลง"' + (idx === len - 1 ? ' disabled' : '') + '>↓</button></span>';
     }
+    // every place a set can go: "บทที่ 1 › เรื่อง ..."
+    var targets = [];
+    m.units.forEach(function (u, ui) {
+      u.lessons.forEach(function (l, li) {
+        targets.push({ v: ui + ':' + li, label: 'บทที่ ' + (ui + 1) + (u.name ? ' ' + u.name : '') + ' › ' + (l.name || 'รวมทั้งบท') });
+      });
+    });
+    function moveSelect(ui, li, title) {
+      return '<select class="mg-select" data-mg-set="' + esc(title) + '" data-from="' + ui + ':' + li + '" aria-label="ย้ายชุด ' + esc(title) + '">' +
+        targets.map(function (t) { return '<option value="' + t.v + '"' + (t.v === ui + ':' + li ? ' selected' : '') + '>' + esc(t.label) + '</option>'; }).join('') + '</select>';
+    }
     var html = '<div class="panel card block manage">' +
-      '<p class="note" style="margin-top:0"><b>เปลี่ยนชื่อ</b> พิมพ์ชื่อใหม่ในช่อง • <b>รวมบท</b> ตั้งชื่อให้เหมือนบทอื่น แล้วบันทึก • <b>เรียงลำดับ</b> กดลูกศร ↑ ↓ นักเรียนจะเห็นตามลำดับนี้</p>' +
-      (m.fileCount ? '<p class="note">มี ' + m.fileCount + ' ชุดที่อยู่ในไฟล์เว็บ (questions.json) จัดการจากหน้านี้ไม่ได้ จะแสดงต่อจากบทที่จัดไว้</p>' : '') +
+      '<p class="note" style="margin-top:0">พิมพ์ในช่องเพื่อเปลี่ยนชื่อ กด ↑ ↓ เพื่อเรียง ย้ายชุดได้จากช่องเลือกข้างชื่อชุด</p>' +
+      (m.fileCount ? '<p class="note">อีก ' + m.fileCount + ' ชุดอยู่ในไฟล์เว็บ แก้จากหน้านี้ไม่ได้</p>' : '') +
       (m.msg ? '<p class="msg ' + m.msg.kind + '">' + esc(m.msg.text) + '</p>' : '');
     html += m.units.map(function (u, ui) {
+      var unitSets = u.lessons.reduce(function (n, l) { return n + l.titles.length; }, 0);
       return '<div class="mg-unit"><div class="mg-row"><span class="mg-no">บทที่ ' + (ui + 1) + '</span>' +
         '<input type="text" class="mg-input" data-mg="unit" data-i="' + ui + '" value="' + esc(u.name) + '" placeholder="ชื่อบท เช่น เศษส่วน" />' +
-        arrows('unit', ui, m.units.length) + '</div>' +
+        arrows('unit', ui, m.units.length) +
+        '<button type="button" class="btn btn-ghost btn-sm mg-del" data-action="mg-del-unit" data-i="' + ui + '"' + (unitSets ? ' disabled title="ย้ายชุดข้อสอบออกก่อน"' : '') + '>ลบบท</button></div>' +
         '<div class="mg-lessons">' + u.lessons.map(function (l, li) {
-          return '<div class="mg-row mg-lesson"><span class="mg-no">เรื่อง</span>' +
-            '<input type="text" class="mg-input" data-mg="lesson" data-i="' + ui + '" data-j="' + li + '" value="' + esc(l.name) + '" placeholder="(ชุดรวมทั้งบท)" />' +
+          return '<div class="mg-lesson-box"><div class="mg-row mg-lesson"><span class="mg-no">เรื่อง</span>' +
+            '<input type="text" class="mg-input" data-mg="lesson" data-i="' + ui + '" data-j="' + li + '" value="' + esc(l.name) + '" placeholder="ไม่ใส่ = ชุดรวมทั้งบท" />' +
             arrows('lesson', li, u.lessons.length, ' data-u="' + ui + '"') +
-            '<span class="mg-sets">' + l.titles.length + ' ชุด</span></div>';
-        }).join('') + '</div></div>';
+            '<button type="button" class="btn btn-ghost btn-sm mg-del" data-action="mg-del-lesson" data-i="' + ui + '" data-j="' + li + '"' + (l.titles.length ? ' disabled title="ย้ายชุดข้อสอบออกก่อน"' : '') + '>ลบ</button></div>' +
+            (l.titles.length
+              ? '<ul class="mg-sets-list">' + l.titles.map(function (title) {
+                  return '<li><span class="mg-set-name">' + esc(title) + '</span>' + moveSelect(ui, li, title) + '</li>';
+                }).join('') + '</ul>'
+              : '<p class="mg-empty">ยังไม่มีชุดข้อสอบ ย้ายชุดมาใส่ได้จากช่องเลือกของชุดอื่น</p>') +
+            '</div>';
+        }).join('') +
+        '<button type="button" class="btn btn-sm mg-add" data-action="mg-add-lesson" data-i="' + ui + '">+ เพิ่มเรื่อง</button></div></div>';
     }).join('');
-    html += '<div class="btn-row" style="margin-top:16px"><button type="button" class="btn btn-primary" data-action="mg-save"' + (m.busy ? ' disabled' : '') + '>' + (m.busy ? 'กำลังบันทึก...' : 'บันทึก') + '</button>' +
+    html += '<button type="button" class="btn btn-sm mg-add mg-add-unit" data-action="mg-add-unit">+ เพิ่มบท</button>' +
+      '<p class="note">บทหรือเรื่องที่ไม่มีชุดข้อสอบจะไม่ถูกบันทึก</p>' +
+      '<div class="btn-row" style="margin-top:12px"><button type="button" class="btn btn-primary" data-action="mg-save"' + (m.busy ? ' disabled' : '') + '>' + (m.busy ? 'กำลังบันทึก...' : 'บันทึก') + '</button>' +
       '<button type="button" class="btn btn-ghost btn-sm" data-action="mg-close">ยกเลิก</button></div></div>';
     return html;
   }
@@ -1692,9 +1718,28 @@
     render();
   }
 
+  function moveSet(select) {
+    var m = state.manage;
+    var from = select.dataset.from.split(':').map(Number);
+    var to = select.value.split(':').map(Number);
+    var title = select.dataset.mgSet;
+    var src = m.units[from[0]].lessons[from[1]].titles;
+    src.splice(src.indexOf(title), 1);
+    m.units[to[0]].lessons[to[1]].titles.push(title);
+    render();
+  }
+
+  function keepManageScroll(fn) {
+    var y = window.scrollY;
+    fn();
+    render();
+    window.scrollTo(0, y);
+  }
+
   function saveManage() {
     var m = state.manage;
-    if (m.units.some(function (u) { return !u.name.trim(); })) {
+    var used = m.units.filter(function (u) { return u.lessons.some(function (l) { return l.titles.length; }); });
+    if (used.some(function (u) { return !u.name.trim(); })) {
       m.msg = { kind: 'bad', text: 'ใส่ชื่อบทให้ครบทุกบทก่อนนะครับ' };
       render();
       return;
@@ -1702,8 +1747,8 @@
     var tooOld = needsVersion(SCRIPT_VERSION);
     if (tooOld) { m.msg = { kind: 'bad', text: tooOld }; render(); return; }
     var updates = [];
-    m.units.forEach(function (u, ui) {
-      u.lessons.forEach(function (l, li) {
+    used.forEach(function (u, ui) {
+      u.lessons.filter(function (l) { return l.titles.length; }).forEach(function (l, li) {
         l.titles.forEach(function (title, si) {
           updates.push({ title: title, fields: { 'หน่วยการเรียนรู้': u.name.trim(), 'เรื่อง': l.name.trim(), 'ลำดับ': String((ui + 1) * 1000 + (li + 1) * 10 + si) } });
         });
@@ -1724,7 +1769,7 @@
         state.stats = null;
         analyze();
         state.manage = null;
-        state.statusMsg = { kind: 'ok', text: 'บันทึกบทและลำดับแล้ว นักเรียนจะเห็นตามนี้เมื่อเปิดเว็บครั้งถัดไป' };
+        state.statusMsg = { kind: 'ok', text: 'บันทึกแล้ว' };
         render();
       });
     }).catch(function (err) {
@@ -1821,7 +1866,7 @@
     var publish = status === 'เผยแพร่';
     askConfirm({
       title: publish ? 'เผยแพร่ "' + exam.title + '" ให้นักเรียนไหม?' : 'ซ่อน "' + exam.title + '" เป็นร่างไหม?',
-      note: publish ? 'นักเรียนจะเห็นชุดนี้เมื่อเปิดเว็บครั้งถัดไป (' + exam.questions.length + ' ข้อ)' : 'นักเรียนจะไม่เห็นชุดนี้จนกว่าครูจะเผยแพร่อีกครั้ง คะแนนเดิมยังอยู่',
+      note: publish ? 'นักเรียนจะเห็นชุดนี้เมื่อเปิดเว็บครั้งถัดไป (' + exam.questions.length + ' ข้อ)' : 'นักเรียนจะไม่เห็นชุดนี้ คะแนนเดิมยังอยู่',
       ok: publish ? 'เผยแพร่' : 'ซ่อนเป็นร่าง'
     }, function () {
       var tooOld = needsVersion(SCRIPT_VERSION);
@@ -1840,7 +1885,7 @@
           state.stats = null;
           analyze();
           state.statusBusy = false;
-          state.statusMsg = { kind: 'ok', text: publish ? 'เผยแพร่แล้ว นักเรียนจะเห็นชุดนี้เมื่อเปิดเว็บครั้งถัดไป' : 'ซ่อนเป็นร่างแล้ว นักเรียนจะไม่เห็นชุดนี้' };
+          state.statusMsg = { kind: 'ok', text: publish ? 'เผยแพร่แล้ว' : 'ซ่อนแล้ว' };
           render();
         });
       }).catch(function (err) {
@@ -1858,7 +1903,7 @@
     if (!SHEETS_URL || !v || v >= SCRIPT_VERSION) return '';
     return '<div class="update-banner no-print"><img src="img/3d/light_bulb.png" alt="" />' +
       '<div><b>อัปเดตสคริปต์ Google เป็นเวอร์ชัน ' + SCRIPT_VERSION + ' (ตอนนี้เวอร์ชัน ' + v + ')</b>' +
-      '<span>ต้องอัปเดตก่อนจึงจะใช้ บัญชีนักเรียน การแก้ข้อสอบทีละข้อ อัปโหลดรูป และการเผยแพร่ข้อสอบได้ ใช้เวลาประมาณ 2 นาที</span></div>' +
+      '<span>ต้องอัปเดตก่อน บัญชีนักเรียน การแก้ข้อสอบ และการเผยแพร่จึงจะใช้ได้ (ราว 2 นาที)</span></div>' +
       '<button type="button" class="btn btn-sm btn-primary" data-action="show-update">ดูวิธีอัปเดต</button></div>';
   }
 
@@ -1883,8 +1928,8 @@
   }
 
   function accountsProblem(reply) {
-    if (reply && reply.error === 'unauthorized') return 'รหัสครูในเครื่องนี้ไม่ตรงกับ TEACHER_KEY ในสคริปต์ ไปที่ ตั้งค่า แล้วกรอกรหัสครูใหม่';
-    if (!reply || !reply.ok) return 'สคริปต์ Google ยังไม่รองรับบัญชีนักเรียน ให้อัปเดตสคริปต์เป็นเวอร์ชัน ' + SCRIPT_VERSION + ' ก่อน (ดูวิธีที่ คลังข้อสอบ > วิธีเพิ่มข้อสอบผ่าน Google Sheets ขั้นตอนที่ 1)';
+    if (reply && reply.error === 'unauthorized') return 'รหัสครูไม่ตรงกับ TEACHER_KEY ในสคริปต์ กรอกใหม่ในเมนูตั้งค่า';
+    if (!reply || !reply.ok) return 'สคริปต์ Google ยังเก่า อัปเดตเป็นเวอร์ชัน ' + SCRIPT_VERSION + ' ก่อน (ดูวิธีที่ คลังข้อสอบ > วิธีเพิ่มข้อสอบผ่าน Google Sheets ขั้นตอนที่ 1)';
     return '';
   }
 
@@ -1983,7 +2028,7 @@
               '<td><input class="acc-input" data-acc-draft="' + ri + '" data-field="password" value="' + esc(r.password) + '" placeholder="' + (r.exists ? 'เว้นว่าง = ใช้รหัสเดิม' : 'อย่างน้อย 4 ตัว') + '" aria-label="รหัสผ่านของ ' + esc(r.name) + '" autocapitalize="none" spellcheck="false" />' +
               (r.exists ? '<div class="acc-hint">มีบัญชีนี้แล้ว จะอัปเดตข้อมูล</div>' : '') + '</td></tr>';
           }).join('') + '</tbody></table></div>' +
-          '<p class="note">แก้ชื่อผู้ใช้และรหัสผ่านในตารางได้เลย ใช้ตัวอักษรอังกฤษ ตัวเลข หรือภาษาไทยก็ได้ แต่ห้ามมีเว้นวรรค และรหัสผ่านต้องมีอย่างน้อย 4 ตัว</p>' +
+          '<p class="note">แก้ชื่อผู้ใช้และรหัสผ่านในตารางได้ ห้ามเว้นวรรค รหัสผ่านอย่างน้อย 4 ตัว</p>' +
           '<div class="btn-row" style="margin-top:12px"><button type="button" class="btn btn-primary" data-action="acc-save"' + (a.busy ? ' disabled' : '') + '>' +
             (a.busy ? 'กำลังบันทึก...' : 'บันทึก ' + a.draft.rows.length + ' บัญชี' + (fresh < a.draft.rows.length ? ' (ใหม่ ' + fresh + ')' : '')) + '</button>' +
             '<button type="button" class="btn btn-ghost btn-sm" data-action="acc-cancel">ยกเลิก</button></div>' : '') +
@@ -2009,7 +2054,7 @@
           '<button type="button" class="btn btn-sm" data-action="acc-reset" data-user="' + esc(st.username) + '"' + (a.busy ? ' disabled' : '') + '>ตั้งรหัสใหม่</button>' +
           '<button type="button" class="btn btn-ghost btn-sm ed-delete" data-action="acc-delete" data-user="' + esc(st.username) + '"' + (a.busy ? ' disabled' : '') + '>ลบ</button></td></tr>';
       }).join('') + '</tbody></table></div>' +
-      '<p class="note">กด "แก้ไข" เพื่อตั้งชื่อผู้ใช้หรือรหัสผ่านเอง • นักเรียนลืมรหัส: กด "ตั้งรหัสใหม่" แล้วบอกรหัสใหม่ เครื่องที่เคยเข้าไว้จะต้องเข้าสู่ระบบใหม่ ส่วนคะแนนและข้อที่เคยผิดยังอยู่ครบ</p></div>';
+      '<p class="note">กด "แก้ไข" เพื่อตั้งชื่อผู้ใช้หรือรหัสผ่านเอง • นักเรียนลืมรหัส: กด "ตั้งรหัสใหม่" แล้วบอกรหัสใหม่ คะแนนเดิมยังอยู่</p></div>';
     return html;
   }
 
@@ -2060,7 +2105,7 @@
     askConfirm({
       title: 'ตั้งรหัสผ่านใหม่ให้ ' + username + ' ไหม?',
       text: 'รหัสใหม่: ' + pass,
-      note: 'เครื่องที่นักเรียนเคยเข้าไว้จะต้องเข้าสู่ระบบใหม่ด้วยรหัสนี้ คะแนนเดิมยังอยู่ครบ',
+      note: 'นักเรียนต้องเข้าสู่ระบบใหม่ด้วยรหัสนี้ คะแนนเดิมยังอยู่',
       ok: 'ตั้งรหัสใหม่'
     }, function () {
       saveAccounts([{ username: username, password: pass }], function () { return 'ตั้งรหัสใหม่ให้ ' + username + ' แล้ว: ' + pass; });
@@ -2070,7 +2115,7 @@
   function deleteAccount(username) {
     askConfirm({
       title: 'ลบบัญชี ' + username + ' ไหม?',
-      note: 'นักเรียนคนนี้จะเข้าสู่ระบบไม่ได้อีก คะแนนที่ส่งมาแล้วในแท็บ results ยังอยู่',
+      note: 'นักเรียนคนนี้จะเข้าไม่ได้อีก คะแนนที่ส่งมาแล้วยังอยู่',
       ok: 'ลบบัญชี', danger: true
     }, function () { doDeleteAccount(username); });
   }
@@ -2169,7 +2214,7 @@
       state.scriptText = t;
       if ($('scriptBox')) $('scriptBox').textContent = t;
     }).catch(function () {
-      box.textContent = 'โหลดสคริปต์ไม่ได้ เปิดไฟล์ teacher-setup/apps-script.txt ในโฟลเดอร์แทนได้';
+      box.textContent = 'โหลดสคริปต์ไม่ได้ เปิดไฟล์ teacher-setup/apps-script.txt แทน';
     });
   }
 
@@ -2207,9 +2252,19 @@
     else if (a === 'close-student') { state.studentKey = null; render(); }
     else if (a === 'pick-analysis') { state.analysisExamId = t.dataset.exam; render(); }
     else if (a === 'open-bank') { state.statusMsg = null; state.bankExamId = t.dataset.exam; state.edit = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    else if (a === 'overview-subject') {
+      state.view = 'bank'; state.bankExamId = null; state.manage = null;
+      state.bankNav = { subject: t.dataset.s, unit: '', lesson: '' };
+      render();
+      window.scrollTo(0, 0);
+    }
     else if (a === 'manage-open') { openManage(t.dataset.subject); render(); }
     else if (a === 'mg-close') { state.manage = null; render(); }
     else if (a === 'mg-move') moveManage(t);
+    else if (a === 'mg-add-unit') keepManageScroll(function () { state.manage.units.push({ name: '', lessons: [{ name: '', titles: [] }] }); });
+    else if (a === 'mg-add-lesson') keepManageScroll(function () { state.manage.units[Number(t.dataset.i)].lessons.push({ name: '', titles: [] }); });
+    else if (a === 'mg-del-unit') keepManageScroll(function () { state.manage.units.splice(Number(t.dataset.i), 1); });
+    else if (a === 'mg-del-lesson') keepManageScroll(function () { state.manage.units[Number(t.dataset.i)].lessons.splice(Number(t.dataset.j), 1); });
     else if (a === 'mg-save') saveManage();
     else if (a === 'export-summary') exportSummary();
     else if (a === 'export-attempts') exportAttempts();
@@ -2261,7 +2316,7 @@
       });
       if (bad.length) { d.issues = bad; render(); return; }
       var rows = d.rows.map(function (r) { return { username: r.username, password: r.password, number: r.number, name: r.name, room: r.room }; });
-      saveAccounts(rows, function (reply) { return 'บันทึกแล้ว เพิ่มใหม่ ' + reply.added + ' คน อัปเดต ' + reply.updated + ' คน กด "พิมพ์บัตรเข้าระบบ" เพื่อแจกนักเรียนได้เลย'; });
+      saveAccounts(rows, function (reply) { return 'บันทึกแล้ว เพิ่ม ' + reply.added + ' คน แก้ ' + reply.updated + ' คน'; });
     }
     else if (a === 'acc-edit') {
       var st = (state.accounts.list || []).find(function (x) { return x.username === t.dataset.user; });
@@ -2393,6 +2448,7 @@
     document.addEventListener('change', function (e) {
       if (e.target.id === 'importFile') readImportFile(e.target.files[0]);
       if (e.target.id === 'edImageFile') uploadEditImage(e.target.files[0]);
+      if (e.target.dataset.mgSet && state.manage) { var y = window.scrollY; moveSet(e.target); window.scrollTo(0, y); return; }
       if (e.target.dataset.draft && state.draft) {
         state.draft.exams[Number(e.target.dataset.draft)][e.target.dataset.field] = e.target.value.trim();
         if (e.target.dataset.rerender || e.target.dataset.field === 'title') {

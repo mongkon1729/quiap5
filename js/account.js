@@ -47,7 +47,7 @@ var Account = (function () {
 
   // Resolves with the session, or rejects with a message a child can act on.
   function login(username, password) {
-    if (!url()) return Promise.reject(new Error('เว็บนี้ยังไม่ได้เชื่อมกับระบบของคุณครู บอกคุณครูให้ช่วยดูนะ'));
+    if (!url()) return Promise.reject(new Error('เว็บยังไม่ได้เชื่อมกับระบบของคุณครู บอกคุณครูนะ'));
     return post({ action: 'studentLogin', username: username, password: password }).then(function (reply) {
       if (reply && reply.ok && reply.student) {
         var s = reply.student;
@@ -63,10 +63,10 @@ var Account = (function () {
         if (reply.progress) Storage.importProgress(session.username, reply.progress);
         return session;
       }
-      if (reply && reply.error === 'wrong') throw new Error('ชื่อผู้ใช้หรือรหัสผ่านยังไม่ถูกนะ ลองพิมพ์ใหม่อีกครั้ง ถ้ายังเข้าไม่ได้ให้บอกคุณครูช่วยดูให้นะ');
-      throw new Error('ระบบของคุณครูยังไม่พร้อม บอกคุณครูให้อัปเดตสคริปต์ Google เป็นเวอร์ชันล่าสุดนะ');
+      if (reply && reply.error === 'wrong') throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูก ลองพิมพ์ใหม่ ถ้ายังเข้าไม่ได้ให้บอกคุณครูนะ');
+      throw new Error('ระบบยังไม่พร้อม บอกคุณครูให้อัปเดตสคริปต์ Google นะ');
     }, function () {
-      throw new Error('ต่ออินเทอร์เน็ตไม่ได้ เข้าสู่ระบบครั้งแรกต้องใช้อินเทอร์เน็ตนะ ลองใหม่อีกครั้ง');
+      throw new Error('ไม่มีเน็ต เข้าสู่ระบบครั้งแรกต้องต่อเน็ตก่อนนะ');
     });
   }
 

@@ -164,7 +164,7 @@
     el.userChipName.textContent = state.displayName || '';
     if (state.currentUserName) {
       el.heroTitle.textContent = 'สวัสดี ' + state.displayName;
-      el.heroSub.textContent = 'ทำได้ดีมาก ฝึกต่ออีกสักชุดไหม';
+      el.heroSub.textContent = 'ฝึกต่ออีกสักชุดไหม';
     }
   }
 
@@ -384,7 +384,7 @@
   function startReviewOrHint() {
     var n = state.currentUserName ? Storage.getWrongQuestions(state.currentUserName).length : 0;
     if (n > 0) { startReview(); return; }
-    var hint = 'ตอนนี้ยังไม่มีข้อที่ตอบผิด เก่งมากเลย ลองทำชุดใหม่เพิ่มดูนะ';
+    var hint = 'ยังไม่มีข้อที่ตอบผิด ลองทำชุดใหม่ดูนะ';
     el.sidePromoText.textContent = hint;
     if (window.matchMedia('(max-width: 1023px)').matches) showConfirm(hint, null, 'ตกลง');
   }
@@ -514,10 +514,10 @@
   }
 
   function askLogout() {
-    showConfirm('ออกจากระบบของ "' + state.displayName + '" ไหม คะแนนและข้อที่เคยผิดเก็บไว้ครบ เข้าสู่ระบบใหม่เมื่อไหร่ก็เห็นเหมือนเดิม', function () {
+    showConfirm('ออกจากระบบของ "' + state.displayName + '" ไหม คะแนนยังเก็บไว้ครบ', function () {
       Account.logout();
-      el.heroTitle.textContent = 'วันนี้ฝึกทำข้อสอบกันไหม';
-      el.heroSub.textContent = 'เลือกวิชาด้านล่างได้เลย ทำทีละข้อ มีเฉลยให้ทุกข้อ';
+      el.heroTitle.textContent = 'วันนี้ฝึกอะไรดี';
+      el.heroSub.textContent = 'เลือกวิชาด้านล่าง ทำทีละข้อ มีเฉลยทุกข้อ';
       showLogin();
     }, 'ออกจากระบบ');
   }
@@ -770,7 +770,7 @@
       box.className = 'sync-status ' + (sent ? 'is-sent' : 'is-queued');
       box.textContent = sent
         ? '✓ ส่งคะแนนให้คุณครูแล้ว'
-        : 'ยังส่งคะแนนไม่ได้ (ไม่มีอินเทอร์เน็ต) ไม่ต้องห่วง เว็บจะส่งให้เองเมื่อต่อเน็ตได้';
+        : 'ยังไม่มีเน็ต จะส่งคะแนนให้เองเมื่อต่อเน็ตได้';
     });
   }
 
@@ -781,9 +781,9 @@
     if (pct >= 80) {
       message = pct === 100 ? 'ถูกครบทุกข้อ เก่งมาก' : 'เก่งมาก ตอบถูกเกือบหมดเลย';
     } else if (pct >= 50) {
-      message = 'ทำได้ดีนะ ทบทวนข้อที่ผิดอีกนิด คราวหน้าได้เพิ่มแน่';
+      message = 'ทำได้ดี ทบทวนข้อที่ผิดอีกนิดนะ';
     } else {
-      message = 'ไม่เป็นไรนะ ต้นกล้าก็ค่อยๆ โต ลองทบทวนข้อที่ผิด แล้วกลับมาทำใหม่กัน';
+      message = 'ไม่เป็นไรนะ ทบทวนข้อที่ผิดแล้วลองใหม่';
     }
 
     // a picture for every result, so every child leaves with something nice
@@ -1022,7 +1022,7 @@
     setSignedIn(session);
     if (!session) showLogin();
     else Account.refreshProgress().then(function (changed) {
-      if (changed === 'signedOut') showLogin('คุณครูเปลี่ยนรหัสผ่านของบัญชีนี้แล้ว เข้าสู่ระบบด้วยรหัสใหม่นะ');
+      if (changed === 'signedOut') showLogin('คุณครูเปลี่ยนรหัสผ่านแล้ว ใช้รหัสใหม่เข้าสู่ระบบนะ');
       else if (changed && !el.screenStart.hidden) renderStartScreen();
     });
 
@@ -1037,7 +1037,7 @@
       examsData = { exams: data.exams.filter(function (e) { return e.status !== 'draft'; }) };
       if (!el.screenStart.hidden && state.currentUserName) renderStartScreen();
     }, function () {
-      el.examList.innerHTML = '<p class="empty-note">โหลดข้อสอบไม่ได้ ลองเช็กอินเทอร์เน็ตแล้วรีเฟรชหน้านี้อีกครั้งนะ</p>';
+      el.examList.innerHTML = '<p class="empty-note">โหลดข้อสอบไม่ได้ เช็กเน็ตแล้วรีเฟรชหน้านี้นะ</p>';
     });
   }
 
