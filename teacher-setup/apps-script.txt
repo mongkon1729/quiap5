@@ -1,4 +1,4 @@
-// ===== ห้องติว ป.5 : สคริปต์รับคะแนนและข้อสอบ (เวอร์ชัน 6) =====
+// ===== ห้องติว ป.5 : สคริปต์รับคะแนนและข้อสอบ (เวอร์ชัน 7) =====
 // 1) เปลี่ยนรหัสด้านล่างเป็นรหัสลับของครูเอง (ใช้เปิดหน้าครู) ห้ามบอกนักเรียน
 var TEACHER_KEY = 'เปลี่ยนเป็นรหัสลับของครู';
 
@@ -10,7 +10,7 @@ var EXAM_SHEET_NAME = 'ข้อสอบ';
 var EXAM_HEADERS = ['ชุดข้อสอบ', 'วิชา', 'เวลา(นาที)', 'หัวข้อ', 'ตัวชี้วัด', 'Bloom', 'คำถาม',
   'ก', 'ข', 'ค', 'ง', 'คำตอบ', 'คำอธิบาย', 'รูปภาพ',
   'ความยาก', 'ระดับชั้น', 'กลุ่มสาระ', 'รหัสวิชา', 'สาระ', 'มาตรฐาน',
-  'หน่วยการเรียนรู้', 'เรื่อง', 'ประเภทการสอบ', 'ความยากของชุด', 'สถานะ'];
+  'หน่วยการเรียนรู้', 'เรื่อง', 'ประเภทการสอบ', 'ความยากของชุด', 'สถานะ', 'ลำดับ'];
 
 // Adds any missing columns to the right of the header row, so older sheets keep working.
 function examHeaders_(sheet, wanted) {
@@ -360,6 +360,48 @@ function setExamStatus_(data) {
   }
 }
 
+// data.updates: [{ title, fields: { 'หน่วยการเรียนรู้': ..., 'เรื่อง': ..., 'ลำดับ': ... } }]
+// Writes the values on every row of each set in one pass (used by "จัดการบท").
+function setSetFields_(data) {
+  if (data.key !== TEACHER_KEY) return json_({ ok: false, error: 'unauthorized' });
+  var allowed = ['หน่วยการเรียนรู้', 'เรื่อง', 'ลำดับ'];
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sheet = getExamSheet_();
+    var header = examHeaders_(sheet, allowed);
+    var titleCol = header.indexOf('ชุดข้อสอบ');
+    var questionCol = header.indexOf('คำถาม');
+    var values = readExams_();
+    var byTitle = {};
+    (data.updates || []).forEach(function (u) { byTitle[u.title] = u.fields || {}; });
+    var n = values.length - 1;
+    if (n < 1) return json_({ ok: true, rows: 0 });
+    var columns = {};
+    allowed.forEach(function (h) {
+      var c = header.indexOf(h);
+      columns[h] = { col: c, cells: sheet.getRange(2, c + 1, n, 1).getDisplayValues() };
+    });
+    var lastTitle = '';
+    var count = 0;
+    for (var r = 1; r < values.length; r++) {
+      lastTitle = values[r][titleCol] || lastTitle;
+      var fields = byTitle[lastTitle];
+      if (!fields || !values[r][questionCol]) continue;
+      allowed.forEach(function (h) {
+        if (fields[h] !== undefined) columns[h].cells[r - 1][0] = clip_(fields[h], 200);
+      });
+      count++;
+    }
+    allowed.forEach(function (h) {
+      sheet.getRange(2, columns[h].col + 1, n, 1).setNumberFormat('@').setValues(columns[h].cells);
+    });
+    return json_({ ok: true, rows: count });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function doPost(e) {
   var data = JSON.parse(e.postData.contents);
   if (data.action === 'importExams') return importExams_(data);
@@ -367,6 +409,7 @@ function doPost(e) {
   if (data.action === 'deleteQuestion') return deleteQuestion_(data);
   if (data.action === 'uploadImage') return uploadImage_(data);
   if (data.action === 'setExamStatus') return setExamStatus_(data);
+  if (data.action === 'setSetFields') return setSetFields_(data);
   if (data.action === 'studentLogin') return studentLogin_(data);
   if (data.action === 'studentProgress') return studentProgress_(data);
   if (data.action === 'saveProgress') return saveProgress_(data);
@@ -407,7 +450,7 @@ function doPost(e) {
 
 function doGet(e) {
   if (e.parameter.action === 'exams') {
-    return json_({ ok: true, version: 6, values: readExams_() });
+    return json_({ ok: true, version: 7, values: readExams_() });
   }
   if (!e.parameter.key || e.parameter.key !== TEACHER_KEY) {
     return json_({ ok: false, error: 'unauthorized' });

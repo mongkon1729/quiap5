@@ -51,6 +51,9 @@
     el.browseTitle = document.getElementById('browseTitle');
     el.browseCrumbs = document.getElementById('browseCrumbs');
     el.searchInput = document.getElementById('searchInput');
+    el.offlinePill = document.getElementById('offlinePill');
+    el.installCard = document.getElementById('installCard');
+    el.btnInstall = document.getElementById('btnInstall');
     el.summaryArt = document.getElementById('summaryArt');
     el.summaryArtSide = document.getElementById('summaryArtSide');
     el.syncStatus = document.getElementById('syncStatus');
@@ -994,6 +997,26 @@
     el.heroShelf.innerHTML = Art.scene('trophy', 'glowing_star', 'light_bulb');
     renderThemeButton();
     ResultSync.flush();
+
+    // offline pill: quizzes keep working, scores wait for the internet
+    function updateOnline() { el.offlinePill.hidden = navigator.onLine !== false; }
+    window.addEventListener('online', updateOnline);
+    window.addEventListener('offline', updateOnline);
+    updateOnline();
+
+    // "add to home screen" card (Android / computers; iPhone uses Share > Add to Home Screen)
+    var installPrompt = null;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      installPrompt = e;
+      el.installCard.hidden = false;
+    });
+    el.btnInstall.addEventListener('click', function () {
+      if (!installPrompt) return;
+      installPrompt.prompt();
+      installPrompt.userChoice.then(function () { installPrompt = null; el.installCard.hidden = true; });
+    });
+    window.addEventListener('appinstalled', function () { el.installCard.hidden = true; });
 
     var session = Account.getSession();
     setSignedIn(session);

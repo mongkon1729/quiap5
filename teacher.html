@@ -6,6 +6,8 @@
 <meta name="google" content="notranslate" />
 <meta name="robots" content="noindex" />
 <title>ห้องครู • ห้องติว ป.5</title>
+<meta name="theme-color" content="#6c5ce7" />
+<link rel="icon" type="image/png" href="img/icon-192.png" />
 <script src="js/theme.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -70,5 +72,10 @@
 <script src="js/examsource.js"></script>
 <script src="js/importer.js"></script>
 <script src="js/teacher.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
+</script>
 </body>
 </html>

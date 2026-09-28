@@ -17,6 +17,7 @@ var ExamSource = (function () {
     examType: ['ประเภทการสอบ', 'ประเภท', 'exam_type'],
     examDifficulty: ['ความยากของชุด', 'exam_difficulty'],
     status: ['สถานะ', 'status'],
+    order: ['ลำดับ', 'order'],
     difficulty: ['ความยาก', 'difficulty'],
     minutes: ['เวลา(นาที)', 'เวลา', 'นาที', 'minutes', 'time_limit'],
     topic: ['หัวข้อ', 'topic'],
@@ -142,7 +143,7 @@ var ExamSource = (function () {
     return { exams: order, issues: issues };
   }
 
-  var SET_FIELDS = ['subject', 'grade', 'learningArea', 'courseCode', 'strand', 'standard', 'unit', 'lesson', 'examType', 'examDifficulty', 'status'];
+  var SET_FIELDS = ['subject', 'grade', 'learningArea', 'courseCode', 'strand', 'standard', 'unit', 'lesson', 'examType', 'examDifficulty', 'status', 'order'];
 
   var LEARNING_AREAS = {
     'ท': 'ภาษาไทย', 'ค': 'คณิตศาสตร์', 'ว': 'วิทยาศาสตร์และเทคโนโลยี', 'ส': 'สังคมศึกษา ศาสนา และวัฒนธรรม',
@@ -256,6 +257,13 @@ var ExamSource = (function () {
     var parsed = values ? parseSheet(values) : { exams: [], issues: [] };
     fileExams.forEach(enrich);
     parsed.exams.forEach(enrich);
+    // sets the teacher arranged come first in that order; the rest keep the sheet order
+    parsed.exams = parsed.exams.map(function (e, i) { return { e: e, i: i, o: parseFloat(e.order) }; })
+      .sort(function (a, b) {
+        var ao = isFinite(a.o) ? a.o : Infinity;
+        var bo = isFinite(b.o) ? b.o : Infinity;
+        return ao === bo ? a.i - b.i : ao - bo;
+      }).map(function (x) { return x.e; });
     return {
       exams: fileExams.concat(parsed.exams),
       sheetExams: parsed.exams,

@@ -914,3 +914,13 @@ body.in-quiz .bottom-nav { display: none; }
 .sync-status.is-sent { background: var(--correct-bg); color: var(--correct-ink); }
 .sync-status.is-queued { background: #fff1cf; color: #7a5300; border-radius: 14px; }
 :root[data-theme="dark"] .sync-status.is-queued { background: #43391f; color: #f5d892; }
+
+/* ---------- รอบ 5: ออฟไลน์ / ติดตั้งแอป ---------- */
+.offline-pill { display: inline-flex; align-items: center; min-height: 36px; padding: 4px 12px; border-radius: 999px; background: #fff1cf; color: #7a5300; font-size: 15px; font-weight: 700; white-space: nowrap; }
+:root[data-theme="dark"] .offline-pill { background: #43391f; color: #f5d892; }
+.install-card { display: flex; align-items: center; gap: 12px; }
+.install-card img { width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0; }
+.install-text { flex: 1; min-width: 0; }
+.install-text h3 { margin: 0; font-size: 17px; }
+.install-text p { margin: 0; font-size: 15px; color: var(--ink-soft); line-height: 1.45; }
+.install-card .btn { flex-shrink: 0; }

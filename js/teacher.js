@@ -2,7 +2,7 @@
   'use strict';
 
   var KEY_STORE = 'quizapp_teacher_key_v1';
-  var SCRIPT_VERSION = 6;
+  var SCRIPT_VERSION = 7;
   var SHEETS_URL = (window.QUIZ_CONFIG && window.QUIZ_CONFIG.sheetsUrl || '').trim();
   var LETTERS = ['ก', 'ข', 'ค', 'ง'];
 
@@ -487,7 +487,10 @@
 
   function renderStudents() {
     var s = state.stats;
-    var html = head('ผลนักเรียน', state.rows.length ? s.students.length + ' คน' : '', refreshBtn());
+    var html = head('ผลนักเรียน', state.rows.length ? s.students.length + ' คน' : '',
+      '<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap">' +
+      (state.rows.length ? '<button type="button" class="btn btn-sm" data-action="export-summary">ดาวน์โหลดสรุปรายคน (Excel)</button>' +
+        '<button type="button" class="btn btn-sm" data-action="export-attempts">ดาวน์โหลดทุกครั้ง (Excel)</button>' : '') + refreshBtn() + '</div>');
     if (!state.rows.length) return html + noDataPanel();
 
     if (state.studentKey && s.studentMap[state.studentKey]) {
@@ -731,7 +734,11 @@
       }).join('') + '</ol></nav>';
 
     if (!unit) {
-      return head(esc(subject.key), units.length + ' บท • ' + countText(subject.items), reload) + crumbs +
+      var canManage = SHEETS_URL && subject.items.some(function (e) { return e.source === 'sheets'; });
+      if (state.manage && state.manage.subject === subject.key) return head(esc(subject.key), 'จัดการบทและเรื่อง', '') + crumbs + manageView();
+      return head(esc(subject.key), units.length + ' บท • ' + countText(subject.items),
+          '<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap">' +
+          (canManage ? '<button type="button" class="btn btn-sm btn-primary" data-action="manage-open" data-subject="' + esc(subject.key) + '">จัดการบท</button>' : '') + reload + '</div>') + crumbs +
         '<div class="nav-list">' + units.map(function (g, i) {
           var n = ES.groupBy(g.items.filter(ES.lessonOf), ES.lessonOf).length;
           return ES.navCardHtml({
@@ -781,7 +788,7 @@
 
 
   var EXAM_HEADERS = ['ชุดข้อสอบ', 'วิชา', 'เวลา(นาที)', 'หัวข้อ', 'ตัวชี้วัด', 'Bloom', 'คำถาม', 'ก', 'ข', 'ค', 'ง', 'คำตอบ', 'คำอธิบาย', 'รูปภาพ',
-    'ความยาก', 'ระดับชั้น', 'กลุ่มสาระ', 'รหัสวิชา', 'สาระ', 'มาตรฐาน', 'หน่วยการเรียนรู้', 'เรื่อง', 'ประเภทการสอบ', 'ความยากของชุด', 'สถานะ'];
+    'ความยาก', 'ระดับชั้น', 'กลุ่มสาระ', 'รหัสวิชา', 'สาระ', 'มาตรฐาน', 'หน่วยการเรียนรู้', 'เรื่อง', 'ประเภทการสอบ', 'ความยากของชุด', 'สถานะ', 'ลำดับ'];
 
   function sheetPanel() {
     if (!SHEETS_URL) {
@@ -1627,6 +1634,162 @@
     }).join('');
   }
 
+  // ---------- จัดการบทและเรื่อง ----------
+
+  function openManage(subjectName) {
+    var ES = ExamSource;
+    var sets = state.exams.filter(function (e) { return ES.subjectOf(e).name === subjectName; });
+    state.manage = {
+      subject: subjectName,
+      fileCount: sets.filter(function (e) { return e.source !== 'sheets'; }).length,
+      busy: false,
+      msg: null,
+      units: ES.groupBy(sets.filter(function (e) { return e.source === 'sheets'; }), ES.unitOf).map(function (g) {
+        return {
+          name: g.key === ES.OTHER_UNIT ? '' : g.key,
+          lessons: ES.groupBy(g.items, ES.lessonOf).map(function (l) {
+            return { name: l.key, titles: l.items.map(function (e) { return e.title; }) };
+          })
+        };
+      })
+    };
+  }
+
+  function manageView() {
+    var m = state.manage;
+    function arrows(kind, idx, len, extra) {
+      return '<span class="mg-arrows">' +
+        '<button type="button" class="icon-btn" data-action="mg-move" data-kind="' + kind + '" data-i="' + idx + '"' + (extra || '') + ' data-dir="-1" aria-label="เลื่อนขึ้น"' + (idx === 0 ? ' disabled' : '') + '>↑</button>' +
+        '<button type="button" class="icon-btn" data-action="mg-move" data-kind="' + kind + '" data-i="' + idx + '"' + (extra || '') + ' data-dir="1" aria-label="เลื่อนลง"' + (idx === len - 1 ? ' disabled' : '') + '>↓</button></span>';
+    }
+    var html = '<div class="panel card block manage">' +
+      '<p class="note" style="margin-top:0"><b>เปลี่ยนชื่อ</b> พิมพ์ชื่อใหม่ในช่อง • <b>รวมบท</b> ตั้งชื่อให้เหมือนบทอื่น แล้วบันทึก • <b>เรียงลำดับ</b> กดลูกศร ↑ ↓ นักเรียนจะเห็นตามลำดับนี้</p>' +
+      (m.fileCount ? '<p class="note">มี ' + m.fileCount + ' ชุดที่อยู่ในไฟล์เว็บ (questions.json) จัดการจากหน้านี้ไม่ได้ จะแสดงต่อจากบทที่จัดไว้</p>' : '') +
+      (m.msg ? '<p class="msg ' + m.msg.kind + '">' + esc(m.msg.text) + '</p>' : '');
+    html += m.units.map(function (u, ui) {
+      return '<div class="mg-unit"><div class="mg-row"><span class="mg-no">บทที่ ' + (ui + 1) + '</span>' +
+        '<input type="text" class="mg-input" data-mg="unit" data-i="' + ui + '" value="' + esc(u.name) + '" placeholder="ชื่อบท เช่น เศษส่วน" />' +
+        arrows('unit', ui, m.units.length) + '</div>' +
+        '<div class="mg-lessons">' + u.lessons.map(function (l, li) {
+          return '<div class="mg-row mg-lesson"><span class="mg-no">เรื่อง</span>' +
+            '<input type="text" class="mg-input" data-mg="lesson" data-i="' + ui + '" data-j="' + li + '" value="' + esc(l.name) + '" placeholder="(ชุดรวมทั้งบท)" />' +
+            arrows('lesson', li, u.lessons.length, ' data-u="' + ui + '"') +
+            '<span class="mg-sets">' + l.titles.length + ' ชุด</span></div>';
+        }).join('') + '</div></div>';
+    }).join('');
+    html += '<div class="btn-row" style="margin-top:16px"><button type="button" class="btn btn-primary" data-action="mg-save"' + (m.busy ? ' disabled' : '') + '>' + (m.busy ? 'กำลังบันทึก...' : 'บันทึก') + '</button>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-action="mg-close">ยกเลิก</button></div></div>';
+    return html;
+  }
+
+  function moveManage(t) {
+    var m = state.manage;
+    var list = t.dataset.kind === 'unit' ? m.units : m.units[Number(t.dataset.u)].lessons;
+    var i = Number(t.dataset.i);
+    var j = i + Number(t.dataset.dir);
+    if (j < 0 || j >= list.length) return;
+    var tmp = list[i]; list[i] = list[j]; list[j] = tmp;
+    render();
+  }
+
+  function saveManage() {
+    var m = state.manage;
+    if (m.units.some(function (u) { return !u.name.trim(); })) {
+      m.msg = { kind: 'bad', text: 'ใส่ชื่อบทให้ครบทุกบทก่อนนะครับ' };
+      render();
+      return;
+    }
+    var tooOld = needsVersion(SCRIPT_VERSION);
+    if (tooOld) { m.msg = { kind: 'bad', text: tooOld }; render(); return; }
+    var updates = [];
+    m.units.forEach(function (u, ui) {
+      u.lessons.forEach(function (l, li) {
+        l.titles.forEach(function (title, si) {
+          updates.push({ title: title, fields: { 'หน่วยการเรียนรู้': u.name.trim(), 'เรื่อง': l.name.trim(), 'ลำดับ': String((ui + 1) * 1000 + (li + 1) * 10 + si) } });
+        });
+      });
+    });
+    m.busy = true;
+    m.msg = null;
+    render();
+    postScript({ action: 'setSetFields', updates: updates }).then(function (reply) {
+      var problem = replyProblem(reply);
+      if (problem) throw new Error(problem);
+      var calls = 0;
+      ExamSource.load(function (data) {
+        calls++;
+        if (calls === 1) return;
+        state.exams = data.exams;
+        state.sheet = data;
+        state.stats = null;
+        analyze();
+        state.manage = null;
+        state.statusMsg = { kind: 'ok', text: 'บันทึกบทและลำดับแล้ว นักเรียนจะเห็นตามนี้เมื่อเปิดเว็บครั้งถัดไป' };
+        render();
+      });
+    }).catch(function (err) {
+      m.busy = false;
+      m.msg = { kind: 'bad', text: err && err.message && err.message.indexOf('fetch') < 0 ? err.message : 'บันทึกไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง' };
+      render();
+    });
+  }
+
+  // ---------- ดาวน์โหลดคะแนนเป็นไฟล์ Excel (CSV) ----------
+
+  function csvCell(v) {
+    var s = String(v == null ? '' : v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function downloadCsv(name, rows) {
+    // BOM so Excel reads Thai correctly
+    var text = '\ufeff' + rows.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  }
+
+  function today() {
+    var d = new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+
+  function exportAttempts() {
+    var rows = [['วันที่', 'เวลา', 'นักเรียน', 'ชุดข้อสอบ', 'คะแนน', 'ตอบ', 'จำนวนข้อ', 'ร้อยละ', 'ทำครบ', 'ใช้เวลา (นาที)']];
+    state.rows.slice().sort(function (a, b) { return a.time - b.time; }).forEach(function (r) {
+      var d = new Date(r.time);
+      rows.push([d.toLocaleDateString('th-TH'), d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }), r.student,
+        r.examTitle || (examById(r.examId) || {}).title || r.examId, r.score, r.answered, r.questionCount,
+        r.questionCount ? Math.round(r.score / r.questionCount * 100) : '', r.completed ? 'ใช่' : 'ไม่ครบ', Math.round(r.durationSec / 6) / 10]);
+    });
+    downloadCsv('คะแนนทุกครั้ง-' + today() + '.csv', rows);
+  }
+
+  // one row per student, best % for each set they finished
+  function exportSummary() {
+    var exams = state.exams;
+    var best = {};
+    var order = [];
+    state.rows.forEach(function (r) {
+      if (!best[r.student]) { best[r.student] = {}; order.push(r.student); }
+      if (!r.completed || !r.questionCount) return;
+      var p = Math.round(r.score / r.questionCount * 100);
+      if (best[r.student][r.examId] == null || p > best[r.student][r.examId]) best[r.student][r.examId] = p;
+    });
+    order.sort(function (a, b) { return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0) || a.localeCompare(b, 'th'); });
+    var rows = [['นักเรียน'].concat(exams.map(function (e) { return e.title + ' (%)'; }), ['ทำครบ (ชุด)', 'เฉลี่ย (%)'])];
+    order.forEach(function (name) {
+      var got = exams.map(function (e) { return best[name][e.id]; });
+      var done = got.filter(function (v) { return v != null; });
+      rows.push([name].concat(got.map(function (v) { return v == null ? '' : v; }), [done.length,
+        done.length ? Math.round(done.reduce(function (s, v) { return s + v; }, 0) / done.length) : '']));
+    });
+    downloadCsv('สรุปคะแนนรายคน-' + today() + '.csv', rows);
+  }
+
   // ---------- กล่องยืนยันในธีม ----------
 
   var confirmAction = null;
@@ -1993,7 +2156,14 @@
     else if (a === 'close-student') { state.studentKey = null; render(); }
     else if (a === 'pick-analysis') { state.analysisExamId = t.dataset.exam; render(); }
     else if (a === 'open-bank') { state.statusMsg = null; state.bankExamId = t.dataset.exam; state.edit = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    else if (a === 'manage-open') { openManage(t.dataset.subject); render(); }
+    else if (a === 'mg-close') { state.manage = null; render(); }
+    else if (a === 'mg-move') moveManage(t);
+    else if (a === 'mg-save') saveManage();
+    else if (a === 'export-summary') exportSummary();
+    else if (a === 'export-attempts') exportAttempts();
     else if (a === 'bank-nav') {
+      state.manage = null;
       state.bankNav = { subject: t.dataset.s || '', unit: t.dataset.u || '', lesson: t.dataset.l || '' };
       render();
       window.scrollTo(0, 0);
@@ -2045,6 +2215,11 @@
   }
 
   function onInput(e) {
+    if (e.target.dataset && e.target.dataset.mg && state.manage) {
+      var u = state.manage.units[Number(e.target.dataset.i)];
+      if (e.target.dataset.mg === 'unit') u.name = e.target.value; else u.lessons[Number(e.target.dataset.j)].name = e.target.value;
+      return;
+    }
     if (e.target.dataset && e.target.dataset.draft && state.draft) {
       state.draft.exams[Number(e.target.dataset.draft)][e.target.dataset.field] = e.target.value.trim();
       return;

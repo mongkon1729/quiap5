@@ -680,3 +680,17 @@ body.teacher {
 .btn-danger { background: #e2574c; color: #fff; border-color: transparent; }
 .btn-danger:hover:not(:disabled) { border-color: transparent; background: #cf4439; }
 .teacher .set-badge { position: absolute; right: 8px; bottom: 8px; padding: 2px 10px; border-radius: 8px; background: rgba(255, 255, 255, .92); color: #3b2f8a; font-size: 13px; font-weight: 700; }
+
+/* จัดการบท */
+.manage .mg-unit { padding: 12px; margin-top: 12px; border: var(--border); border-radius: 16px; background: var(--paper-2); }
+.mg-row { display: flex; align-items: center; gap: 10px; }
+.mg-lessons { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 0 28px; }
+.mg-no { flex-shrink: 0; min-width: 64px; font-weight: 700; font-size: 14px; color: var(--accent); }
+.mg-lesson .mg-no { color: var(--ink-soft); font-weight: 600; }
+.mg-input { flex: 1; min-width: 0; min-height: 44px; padding: 6px 12px; border: var(--border); border-radius: 10px; background: var(--paper); color: var(--ink); font: inherit; font-size: 16px; }
+.mg-lesson .mg-input { font-size: 15px; }
+.mg-arrows { display: flex; gap: 6px; flex-shrink: 0; }
+.mg-arrows .icon-btn { width: 40px; height: 40px; font-size: 18px; font-weight: 700; }
+.mg-arrows .icon-btn:disabled { opacity: .3; cursor: default; }
+.mg-sets { flex-shrink: 0; font-size: 13px; color: var(--ink-soft); }
+@media (max-width: 600px) { .mg-lessons { margin-left: 8px; } .mg-no { min-width: 0; } .mg-sets { display: none; } }
