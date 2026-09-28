@@ -638,3 +638,26 @@ body.teacher {
 .teacher .hero-illus { width: 110px; }
 .teacher .hero-text { max-width: 380px; }
 @media (max-width: 1400px) and (min-width: 1180px) { .teacher .hero-illus-left { display: none; } }
+
+/* บัญชีนักเรียน */
+.acc-draft { margin-top: 14px; }
+.acc-table code, .acc-draft code { font-size: 15px; background: var(--paper-2); padding: 2px 8px; border-radius: 6px; }
+.acc-actions { white-space: nowrap; }
+.acc-actions .btn { margin-left: 4px; }
+
+/* บัตรเข้าระบบ (พิมพ์) */
+#printCards { display: none; }
+@media print {
+  body.printing-cards > *:not(#printCards) { display: none !important; }
+  body.printing-cards { background: #fff !important; padding: 0 !important; }
+  body.printing-cards #printCards { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .login-slip { break-inside: avoid; height: 52mm; padding: 5mm 6mm; border: 1px dashed #999; color: #222; font-family: var(--font); }
+  .slip-head { display: flex; align-items: center; gap: 8px; margin-bottom: 3mm; }
+  .slip-head img { width: 11mm; height: 11mm; }
+  .slip-head b { display: block; font-size: 14pt; }
+  .slip-head span { font-size: 8pt; color: #555; word-break: break-all; }
+  .slip-name { font-size: 13pt; font-weight: 700; margin-bottom: 2mm; }
+  .slip-name small { font-weight: 400; color: #555; }
+  .slip-row { display: flex; justify-content: space-between; align-items: center; font-size: 11pt; padding: 1mm 0; border-top: 1px solid #eee; }
+  .slip-row code { font-size: 15pt; font-weight: 700; letter-spacing: 1px; }
+}

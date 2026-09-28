@@ -1,4 +1,4 @@
-// ===== ห้องติว ป.5 : สคริปต์รับคะแนนและข้อสอบ (เวอร์ชัน 5) =====
+// ===== ห้องติว ป.5 : สคริปต์รับคะแนนและข้อสอบ (เวอร์ชัน 6) =====
 // 1) เปลี่ยนรหัสด้านล่างเป็นรหัสลับของครูเอง (ใช้เปิดหน้าครู) ห้ามบอกนักเรียน
 var TEACHER_KEY = 'เปลี่ยนเป็นรหัสลับของครู';
 
@@ -179,12 +179,171 @@ function uploadImage_(data) {
   return json_({ ok: true, url: 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w1200' });
 }
 
+// ---------- บัญชีนักเรียน (ครูตั้ง username / รหัสผ่านในแท็บ "นักเรียน") ----------
+var STUDENT_SHEET_NAME = 'นักเรียน';
+var STUDENT_HEADERS = ['username', 'รหัสผ่าน', 'เลขที่', 'ชื่อ', 'ห้อง', 'token', 'progress', 'อัปเดตล่าสุด'];
+
+function getStudentSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(STUDENT_SHEET_NAME) || ss.insertSheet(STUDENT_SHEET_NAME);
+  var header = examHeaders_(sheet, STUDENT_HEADERS);
+  return { sheet: sheet, header: header };
+}
+
+function readStudents_() {
+  var st = getStudentSheet_();
+  var last = st.sheet.getLastRow();
+  var rows = last > 1 ? st.sheet.getRange(2, 1, last - 1, st.header.length).getDisplayValues() : [];
+  return rows.map(function (r, i) {
+    var o = { row: i + 2 };
+    st.header.forEach(function (h, c) { o[h] = r[c]; });
+    return o;
+  }).filter(function (o) { return o.username; });
+}
+
+function normUser_(u) {
+  return String(u || '').trim().toLowerCase();
+}
+
+function findStudent_(username) {
+  var key = normUser_(username);
+  var list = readStudents_();
+  for (var i = 0; i < list.length; i++) if (normUser_(list[i].username) === key) return list[i];
+  return null;
+}
+
+function setStudentCell_(row, headerName, value) {
+  var st = getStudentSheet_();
+  var col = st.header.indexOf(headerName);
+  if (col >= 0) st.sheet.getRange(row, col + 1).setNumberFormat('@').setValue(value);
+}
+
+function publicStudent_(s) {
+  return { username: s.username, name: s['ชื่อ'], number: s['เลขที่'], room: s['ห้อง'] };
+}
+
+function parseProgress_(text) {
+  try { return text ? JSON.parse(text) : null; } catch (e) { return null; }
+}
+
+function studentLogin_(data) {
+  var s = findStudent_(data.username);
+  if (!s || !s['รหัสผ่าน'] || String(s['รหัสผ่าน']).trim() !== String(data.password || '').trim()) {
+    Utilities.sleep(800);
+    return json_({ ok: false, error: 'wrong' });
+  }
+  var token = s.token;
+  if (!token) {
+    token = Utilities.getUuid();
+    setStudentCell_(s.row, 'token', token);
+  }
+  return json_({ ok: true, student: publicStudent_(s), token: token, progress: parseProgress_(s.progress) });
+}
+
+function checkToken_(data) {
+  var s = findStudent_(data.username);
+  return s && s.token && s.token === data.token ? s : null;
+}
+
+function studentProgress_(data) {
+  var s = checkToken_(data);
+  if (!s) return json_({ ok: false, error: 'token' });
+  return json_({ ok: true, student: publicStudent_(s), progress: parseProgress_(s.progress) });
+}
+
+function saveProgress_(data) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var s = checkToken_(data);
+    if (!s) return json_({ ok: false, error: 'token' });
+    var text = JSON.stringify(data.progress || {});
+    if (text.length > 45000) return json_({ ok: false, error: 'size' });
+    var old = parseProgress_(s.progress);
+    if (old && (old.updatedAt || 0) > ((data.progress || {}).updatedAt || 0)) return json_({ ok: true, stale: true });
+    setStudentCell_(s.row, 'progress', text);
+    setStudentCell_(s.row, 'อัปเดตล่าสุด', new Date().toISOString());
+    return json_({ ok: true });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function listStudents_(data) {
+  if (data.key !== TEACHER_KEY) return json_({ ok: false, error: 'unauthorized' });
+  return json_({ ok: true, students: readStudents_().map(function (s) {
+    var p = publicStudent_(s);
+    p.password = s['รหัสผ่าน'];
+    p.lastSeen = s['อัปเดตล่าสุด'];
+    return p;
+  }) });
+}
+
+// data.students: [{ username, password, number, name, room }] — adds new ones, updates existing ones.
+function saveStudents_(data) {
+  if (data.key !== TEACHER_KEY) return json_({ ok: false, error: 'unauthorized' });
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var st = getStudentSheet_();
+    var existing = {};
+    readStudents_().forEach(function (s) { existing[normUser_(s.username)] = s; });
+    var added = 0, updated = 0;
+    (data.students || []).slice(0, 300).forEach(function (n) {
+      var user = clip_(String(n.username || '').trim(), 40);
+      if (!user) return;
+      var old = existing[normUser_(user)];
+      if (old) {
+        if (n.password && n.password !== old['รหัสผ่าน']) {
+          setStudentCell_(old.row, 'รหัสผ่าน', clip_(n.password, 40));
+          setStudentCell_(old.row, 'token', '');
+        }
+        if (n.name != null) setStudentCell_(old.row, 'ชื่อ', clip_(n.name, 60));
+        if (n.number != null) setStudentCell_(old.row, 'เลขที่', clip_(n.number, 10));
+        if (n.room != null) setStudentCell_(old.row, 'ห้อง', clip_(n.room, 20));
+        updated++;
+      } else {
+        if (!n.password) return;
+        var row = st.header.map(function (h) {
+          return { 'username': user, 'รหัสผ่าน': clip_(n.password, 40), 'เลขที่': clip_(n.number, 10), 'ชื่อ': clip_(n.name, 60), 'ห้อง': clip_(n.room, 20) }[h] || '';
+        });
+        st.sheet.getRange(st.sheet.getLastRow() + 1, 1, 1, row.length).setNumberFormat('@').setValues([row]);
+        existing[normUser_(user)] = { username: user, row: st.sheet.getLastRow() };
+        added++;
+      }
+    });
+    return json_({ ok: true, added: added, updated: updated });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deleteStudent_(data) {
+  if (data.key !== TEACHER_KEY) return json_({ ok: false, error: 'unauthorized' });
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var s = findStudent_(data.username);
+    if (!s) return json_({ ok: false, error: 'missing' });
+    getStudentSheet_().sheet.deleteRow(s.row);
+    return json_({ ok: true });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function doPost(e) {
   var data = JSON.parse(e.postData.contents);
   if (data.action === 'importExams') return importExams_(data);
   if (data.action === 'updateQuestion') return updateQuestion_(data);
   if (data.action === 'deleteQuestion') return deleteQuestion_(data);
   if (data.action === 'uploadImage') return uploadImage_(data);
+  if (data.action === 'studentLogin') return studentLogin_(data);
+  if (data.action === 'studentProgress') return studentProgress_(data);
+  if (data.action === 'saveProgress') return saveProgress_(data);
+  if (data.action === 'listStudents') return listStudents_(data);
+  if (data.action === 'saveStudents') return saveStudents_(data);
+  if (data.action === 'deleteStudent') return deleteStudent_(data);
   if (!data.student || !data.examId) return json_({ ok: false, error: 'missing fields' });
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -219,7 +378,7 @@ function doPost(e) {
 
 function doGet(e) {
   if (e.parameter.action === 'exams') {
-    return json_({ ok: true, version: 5, values: readExams_() });
+    return json_({ ok: true, version: 6, values: readExams_() });
   }
   if (!e.parameter.key || e.parameter.key !== TEACHER_KEY) {
     return json_({ ok: false, error: 'unauthorized' });

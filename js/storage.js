@@ -94,6 +94,7 @@ var Storage = (function () {
     var prev = profile.bestScores[examId];
     if (!prev || score > prev.score) {
       profile.bestScores[examId] = { score: score, total: total, date: new Date().toISOString() };
+      touch(profile);
       saveProfiles(profiles);
     }
   }
@@ -114,6 +115,7 @@ var Storage = (function () {
     });
     if (!exists) {
       profile.wrongQuestions.push({ examId: examId, questionId: questionId });
+      touch(profile);
       saveProfiles(profiles);
     }
   }
@@ -126,6 +128,7 @@ var Storage = (function () {
     profile.wrongQuestions = profile.wrongQuestions.filter(function (w) {
       return !(w.examId === examId && w.questionId === questionId);
     });
+    touch(profile);
     saveProfiles(profiles);
   }
 
@@ -134,7 +137,47 @@ var Storage = (function () {
     return profile ? profile.wrongQuestions.slice() : [];
   }
 
+  // ---------- accounts set by the teacher (no PIN; the key is the username) ----------
+
+  function ensureProfile(username, displayName) {
+    var key = normalizeName(username);
+    var profiles = loadProfiles();
+    if (!profiles[key]) {
+      profiles[key] = { displayName: displayName || username, bestScores: {}, wrongQuestions: [], updatedAt: 0 };
+    } else if (displayName) {
+      profiles[key].displayName = displayName;
+    }
+    saveProfiles(profiles);
+  }
+
+  function touch(profile) {
+    profile.updatedAt = Date.now();
+  }
+
+  function exportProgress(username) {
+    var p = getProfile(username);
+    if (!p) return null;
+    return { bestScores: p.bestScores, wrongQuestions: p.wrongQuestions, updatedAt: p.updatedAt || 0 };
+  }
+
+  // Takes progress saved on another device when it is newer than ours. Returns true if it changed anything.
+  function importProgress(username, data) {
+    if (!data || typeof data !== 'object') return false;
+    var key = normalizeName(username);
+    var profiles = loadProfiles();
+    var p = profiles[key];
+    if (!p || (data.updatedAt || 0) <= (p.updatedAt || 0)) return false;
+    p.bestScores = data.bestScores || {};
+    p.wrongQuestions = data.wrongQuestions || [];
+    p.updatedAt = data.updatedAt;
+    saveProfiles(profiles);
+    return true;
+  }
+
   return {
+    ensureProfile: ensureProfile,
+    exportProgress: exportProgress,
+    importProgress: importProgress,
     isAvailable: isAvailable,
     profileExists: profileExists,
     verifyOrCreate: verifyOrCreate,

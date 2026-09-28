@@ -2,7 +2,7 @@
   'use strict';
 
   var KEY_STORE = 'quizapp_teacher_key_v1';
-  var SCRIPT_VERSION = 5;
+  var SCRIPT_VERSION = 6;
   var SHEETS_URL = (window.QUIZ_CONFIG && window.QUIZ_CONFIG.sheetsUrl || '').trim();
   var LETTERS = ['ก', 'ข', 'ค', 'ง'];
 
@@ -12,6 +12,7 @@
     analysis: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
     bank: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4z"/><path d="M20 4h-6a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h7z"/></svg>',
     settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+    accounts: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 16.5a3.5 3.5 0 0 1 7 0M15 10h3M15 14h3"/></svg>',
     import: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>',
     sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
     moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
@@ -25,6 +26,7 @@
     { id: 'analysis', label: 'วิเคราะห์ข้อสอบ' },
     { id: 'bank', label: 'คลังข้อสอบ' },
     { id: 'import', label: 'นำเข้าข้อสอบ' },
+    { id: 'accounts', label: 'บัญชีนักเรียน' },
     { id: 'settings', label: 'ตั้งค่า' }
   ];
 
@@ -45,6 +47,7 @@
     importMsg: null,
     pick: { area: 'ส', grade: 'ป.5', touched: false, codes: {}, title: '', subject: '', courseCode: '', unit: '', lesson: '', examType: '', count: '10' },
     importing: false,
+    accounts: { list: null, loading: false, msg: null, draft: null, room: 'p5', paste: '', showPass: false, busy: false },
     studentQuery: '',
     scriptText: null,
     stats: null
@@ -1614,11 +1617,189 @@
     }
   }
 
+
+  // ---------- บัญชีนักเรียน ----------
+
+  function randomPassword() {
+    var n = '';
+    var buf = new Uint32Array(6);
+    (window.crypto || window.msCrypto).getRandomValues(buf);
+    for (var i = 0; i < 6; i++) n += String(buf[i] % 10);
+    return n;
+  }
+
+  function accountsProblem(reply) {
+    if (reply && reply.error === 'unauthorized') return 'รหัสครูในเครื่องนี้ไม่ตรงกับ TEACHER_KEY ในสคริปต์ ไปที่ ตั้งค่า แล้วกรอกรหัสครูใหม่';
+    if (!reply || !reply.ok) return 'สคริปต์ Google ยังไม่รองรับบัญชีนักเรียน ให้อัปเดตสคริปต์เป็นเวอร์ชัน ' + SCRIPT_VERSION + ' ก่อน (ดูวิธีที่ คลังข้อสอบ > วิธีเพิ่มข้อสอบผ่าน Google Sheets ขั้นตอนที่ 1)';
+    return '';
+  }
+
+  function loadAccounts() {
+    var a = state.accounts;
+    if (!SHEETS_URL) return;
+    a.loading = true;
+    postScript({ action: 'listStudents' }).then(function (reply) {
+      var problem = accountsProblem(reply);
+      a.msg = problem ? { kind: 'bad', text: problem } : a.msg;
+      a.list = problem ? [] : reply.students;
+    }).catch(function () {
+      a.msg = { kind: 'bad', text: 'โหลดรายชื่อไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วกด "โหลดใหม่"' };
+      a.list = a.list || [];
+    }).then(function () {
+      a.loading = false;
+      if (state.view === 'accounts') render();
+    });
+  }
+
+  // "12 นัท" or "12<TAB>นัท" per line; a line without a number gets the next free number.
+  function buildAccountDraft() {
+    var a = state.accounts;
+    var room = (a.room || '').trim().toLowerCase().replace(/\s+/g, '');
+    var have = {};
+    (a.list || []).forEach(function (st) { have[String(st.username).toLowerCase()] = st; });
+    var used = {};
+    var rows = [];
+    var issues = [];
+    a.paste.split(/\r?\n/).forEach(function (line, i) {
+      var t = arabicDigits(line).trim();
+      if (!t) return;
+      var m = t.match(/^(\d{1,3})[\s.,\t)-]+(.+)$/);
+      if (!m) { issues.push('บรรทัด ' + (i + 1) + ': ใส่เลขที่นำหน้าชื่อด้วย เช่น "12 นัท"'); return; }
+      var num = String(parseInt(m[1], 10));
+      var name = m[2].replace(/\t/g, ' ').trim();
+      var username = (room ? room + '-' : '') + num;
+      if (used[username]) { issues.push('บรรทัด ' + (i + 1) + ': เลขที่ ' + num + ' ซ้ำ'); return; }
+      used[username] = true;
+      var old = have[username];
+      rows.push({ username: username, password: old ? '' : randomPassword(), number: num, name: name, room: a.room.trim(), exists: !!old });
+    });
+    a.draft = { rows: rows, issues: issues };
+  }
+
+  function saveAccounts(students, doneText) {
+    var a = state.accounts;
+    a.busy = true;
+    a.msg = null;
+    render();
+    return postScript({ action: 'saveStudents', students: students }).then(function (reply) {
+      var problem = accountsProblem(reply);
+      if (problem) { a.msg = { kind: 'bad', text: problem }; return; }
+      a.msg = { kind: 'ok', text: doneText(reply) };
+      a.draft = null;
+      a.paste = '';
+      a.list = null;
+      loadAccounts();
+    }).catch(function () {
+      a.msg = { kind: 'bad', text: 'บันทึกไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง' };
+    }).then(function () {
+      a.busy = false;
+      render();
+    });
+  }
+
+  function renderAccounts() {
+    var a = state.accounts;
+    var list = a.list || [];
+    var html = head('บัญชีนักเรียน', list.length ? list.length + ' คน • นักเรียนใช้ชื่อผู้ใช้และรหัสผ่านนี้เข้าสู่ระบบ' : 'สร้างชื่อผู้ใช้และรหัสผ่านให้นักเรียน',
+      '<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap">' +
+      '<button type="button" class="btn btn-sm" data-action="acc-reload"' + (a.loading ? ' disabled' : '') + '>' + (a.loading ? 'กำลังโหลด...' : 'โหลดใหม่') + '</button>' +
+      (list.length ? '<button type="button" class="btn btn-sm btn-primary" data-action="acc-print">พิมพ์บัตรเข้าระบบ</button>' : '') + '</div>');
+
+    if (!SHEETS_URL) return html + '<div class="panel card"><p class="empty-note">ต้องเชื่อม Google Sheets ก่อน</p></div>';
+    if (a.msg) html += '<div class="panel card block import-msg ' + a.msg.kind + '"><p class="msg ' + a.msg.kind + '" style="margin:0">' + esc(a.msg.text) + '</p></div>';
+
+    // add a class
+    html += '<div class="panel card block no-print"><div class="block-head"><h2>เพิ่มนักเรียนทั้งห้อง</h2></div>' +
+      '<p class="note" style="margin-top:0">คัดลอกคอลัมน์ <b>เลขที่</b> และ <b>ชื่อ</b> จาก Excel มาวาง บรรทัดละ 1 คน ระบบจะตั้งชื่อผู้ใช้เป็น <b>รหัสห้อง-เลขที่</b> และสุ่มรหัสผ่านตัวเลข 6 หลักให้</p>' +
+      '<div class="pick-fields"><label class="pick-field"><span>รหัสห้อง (ใช้นำหน้าชื่อผู้ใช้)</span><input id="accRoom" type="text" value="' + esc(a.room) + '" placeholder="เช่น p5 หรือ p5-1" /></label></div>' +
+      '<textarea id="accPaste" class="import-text" placeholder="1 กานต์&#10;2 ข้าวหอม&#10;3 จิรายุ">' + esc(a.paste) + '</textarea>' +
+      '<div class="btn-row" style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" data-action="acc-preview">สร้างบัญชี</button></div>';
+    if (a.draft) {
+      var fresh = a.draft.rows.filter(function (r) { return !r.exists; }).length;
+      html += '<div class="acc-draft">' +
+        (a.draft.issues.length ? '<div class="error-text"><ul style="margin:0;padding-left:20px">' + a.draft.issues.map(function (m) { return '<li>' + esc(m) + '</li>'; }).join('') + '</ul></div>' : '') +
+        (a.draft.rows.length ? '<div class="table-wrap"><table class="plain"><thead><tr><th>เลขที่</th><th>ชื่อ</th><th>ชื่อผู้ใช้</th><th>รหัสผ่าน</th></tr></thead><tbody>' +
+          a.draft.rows.map(function (r) {
+            return '<tr><td class="num">' + esc(r.number) + '</td><td>' + esc(r.name) + '</td><td><code>' + esc(r.username) + '</code></td><td>' +
+              (r.exists ? '<span class="pill">มีบัญชีแล้ว (อัปเดตชื่อ รหัสเดิม)</span>' : '<code>' + esc(r.password) + '</code>') + '</td></tr>';
+          }).join('') + '</tbody></table></div>' +
+          '<div class="btn-row" style="margin-top:12px"><button type="button" class="btn btn-primary" data-action="acc-save"' + (a.busy ? ' disabled' : '') + '>' +
+            (a.busy ? 'กำลังบันทึก...' : 'บันทึก ' + a.draft.rows.length + ' บัญชี' + (fresh < a.draft.rows.length ? ' (ใหม่ ' + fresh + ')' : '')) + '</button>' +
+            '<button type="button" class="btn btn-ghost btn-sm" data-action="acc-cancel">ยกเลิก</button></div>' : '') +
+        '</div>';
+    }
+    html += '</div>';
+
+    // list
+    if (a.loading && !a.list) return html + '<div class="panel card"><p class="empty-note">กำลังโหลดรายชื่อ...</p></div>';
+    if (!list.length) return html + '<div class="panel card"><p class="empty-note">ยังไม่มีบัญชีนักเรียน วางรายชื่อด้านบนเพื่อเริ่ม</p></div>';
+    var sorted = list.slice().sort(function (x, y) {
+      return String(x.room).localeCompare(String(y.room)) || (parseInt(x.number, 10) || 0) - (parseInt(y.number, 10) || 0);
+    });
+    html += '<div class="panel card block"><div class="block-head"><h2>รายชื่อทั้งหมด</h2>' +
+      '<button type="button" class="btn btn-ghost btn-sm no-print" data-action="acc-toggle-pass">' + (a.showPass ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน') + '</button></div>' +
+      '<div class="table-wrap"><table class="plain acc-table"><thead><tr><th>ห้อง</th><th>เลขที่</th><th>ชื่อ</th><th>ชื่อผู้ใช้</th><th>รหัสผ่าน</th><th>ใช้ล่าสุด</th><th class="no-print"></th></tr></thead><tbody>' +
+      sorted.map(function (st) {
+        return '<tr><td>' + esc(st.room) + '</td><td class="num">' + esc(st.number) + '</td><td>' + esc(st.name) + '</td><td><code>' + esc(st.username) + '</code></td>' +
+          '<td><code>' + (a.showPass ? esc(st.password) : '••••••') + '</code></td>' +
+          '<td class="num">' + (st.lastSeen ? esc(whenText(new Date(st.lastSeen).getTime())) : '-') + '</td>' +
+          '<td class="no-print acc-actions"><button type="button" class="btn btn-sm" data-action="acc-reset" data-user="' + esc(st.username) + '"' + (a.busy ? ' disabled' : '') + '>ตั้งรหัสใหม่</button>' +
+          '<button type="button" class="btn btn-ghost btn-sm ed-delete" data-action="acc-delete" data-user="' + esc(st.username) + '"' + (a.busy ? ' disabled' : '') + '>ลบ</button></td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<p class="note">นักเรียนลืมรหัส: กด "ตั้งรหัสใหม่" แล้วบอกรหัสใหม่ เครื่องที่เคยเข้าไว้จะต้องเข้าสู่ระบบใหม่ ส่วนคะแนนและข้อที่เคยผิดยังอยู่ครบ</p></div>';
+    return html;
+  }
+
+  function resetAccountPassword(username) {
+    var pass = randomPassword();
+    if (!window.confirm('ตั้งรหัสผ่านใหม่ให้ ' + username + ' เป็น ' + pass + ' ใช่ไหม?\n\nเครื่องที่นักเรียนเคยเข้าไว้จะต้องเข้าสู่ระบบใหม่ด้วยรหัสนี้')) return;
+    saveAccounts([{ username: username, password: pass }], function () { return 'ตั้งรหัสใหม่ให้ ' + username + ' แล้ว: ' + pass; });
+  }
+
+  function deleteAccount(username) {
+    if (!window.confirm('ลบบัญชี ' + username + ' ใช่ไหม?\n\nนักเรียนคนนี้จะเข้าสู่ระบบไม่ได้อีก (คะแนนที่ส่งมาแล้วในแท็บ results ยังอยู่)')) return;
+    var a = state.accounts;
+    a.busy = true;
+    render();
+    postScript({ action: 'deleteStudent', username: username }).then(function (reply) {
+      var problem = accountsProblem(reply);
+      a.msg = problem ? { kind: 'bad', text: problem } : { kind: 'ok', text: 'ลบบัญชี ' + username + ' แล้ว' };
+      if (!problem) { a.list = null; loadAccounts(); }
+    }).catch(function () {
+      a.msg = { kind: 'bad', text: 'ลบไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง' };
+    }).then(function () { a.busy = false; render(); });
+  }
+
+  // Cut-out cards, 10 per A4 page, each with the student's username and password.
+  function printAccountCards() {
+    var list = (state.accounts.list || []).slice().sort(function (x, y) {
+      return String(x.room).localeCompare(String(y.room)) || (parseInt(x.number, 10) || 0) - (parseInt(y.number, 10) || 0);
+    });
+    var site = location.href.replace(/teacher\.html.*$/, '');
+    var box = document.createElement('div');
+    box.id = 'printCards';
+    box.innerHTML = list.map(function (st) {
+      return '<div class="login-slip"><div class="slip-head"><img src="img/3d/backpack.png" alt="" /><div><b>ห้องติว</b><span>' + esc(site) + '</span></div></div>' +
+        '<div class="slip-name">' + esc([st.number, st.name].filter(Boolean).join(' ')) + (st.room ? ' <small>' + esc(st.room) + '</small>' : '') + '</div>' +
+        '<div class="slip-row"><span>ชื่อผู้ใช้</span><code>' + esc(st.username) + '</code></div>' +
+        '<div class="slip-row"><span>รหัสผ่าน</span><code>' + esc(st.password) + '</code></div></div>';
+    }).join('');
+    document.body.appendChild(box);
+    document.body.classList.add('printing-cards');
+    var done = function () {
+      document.body.classList.remove('printing-cards');
+      if (box.parentNode) box.parentNode.removeChild(box);
+      window.removeEventListener('afterprint', done);
+    };
+    window.addEventListener('afterprint', done);
+    setTimeout(function () { window.print(); }, 200);
+  }
+
   function render() {
     if (!state.stats) analyze();
     renderNav();
     renderDemoBanner();
-    var views = { overview: renderOverview, students: renderStudents, analysis: renderAnalysis, bank: renderBank, import: renderImport, settings: renderSettings };
+    var views = { overview: renderOverview, students: renderStudents, analysis: renderAnalysis, bank: renderBank, import: renderImport, accounts: renderAccounts, settings: renderSettings };
     var view = $('view');
     view.innerHTML = '<div class="view">' + views[state.view]() + '</div>';
     $('aside').innerHTML = renderAside();
@@ -1653,6 +1834,7 @@
 
   function go(view) {
     state.view = view;
+    if (view === 'accounts' && !state.accounts.list && !state.accounts.loading) loadAccounts();
     state.studentKey = null;
     state.bankExamId = null;
     render();
@@ -1732,6 +1914,17 @@
     }
     else if (a === 'commit-import') commitImport();
     else if (a === 'clear-import') { state.draft = null; state.importMsg = null; state.pasteText = ''; render(); }
+    else if (a === 'acc-reload') { state.accounts.list = null; state.accounts.msg = null; loadAccounts(); render(); }
+    else if (a === 'acc-preview') { state.accounts.room = $('accRoom').value; state.accounts.paste = $('accPaste').value; buildAccountDraft(); render(); }
+    else if (a === 'acc-cancel') { state.accounts.draft = null; render(); }
+    else if (a === 'acc-save') {
+      var rows = state.accounts.draft.rows.map(function (r) { return { username: r.username, password: r.password, number: r.number, name: r.name, room: r.room }; });
+      saveAccounts(rows, function (reply) { return 'บันทึกแล้ว เพิ่มใหม่ ' + reply.added + ' คน อัปเดต ' + reply.updated + ' คน กด "พิมพ์บัตรเข้าระบบ" เพื่อแจกนักเรียนได้เลย'; });
+    }
+    else if (a === 'acc-toggle-pass') { state.accounts.showPass = !state.accounts.showPass; render(); }
+    else if (a === 'acc-reset') resetAccountPassword(t.dataset.user);
+    else if (a === 'acc-delete') deleteAccount(t.dataset.user);
+    else if (a === 'acc-print') printAccountCards();
     else if (a === 'forget-key') { lsSet(KEY_STORE, null); state.connected = false; showLock(); }
   }
 

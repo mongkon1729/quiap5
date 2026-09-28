@@ -833,3 +833,72 @@ img.side-card-icon { width: 40px; height: 40px; }
 .scene3d .s-a { width: 40%; left: 0; top: 0; transform: rotate(-12deg); animation: float3d 5s ease-in-out infinite; }
 .scene3d .s-b { width: 32%; right: 0; bottom: 6%; transform: rotate(10deg); animation: float3d 6s ease-in-out -2s infinite; }
 @keyframes float3d { 0%, 100% { translate: 0 0; } 50% { translate: 0 -8px; } }
+
+/* ---------- เข้าสู่ระบบ ---------- */
+body.need-login .app-side, body.need-login .topbar, body.need-login .bottom-nav { display: none !important; }
+body.need-login .app-shell { display: block; max-width: 520px; }
+.login-wrap { min-height: calc(100vh - 60px); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 18px; padding: 16px 0; }
+.login-card {
+  width: 100%; padding: 28px 22px 22px; text-align: center;
+  background: var(--paper); border: var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.login-art { width: 104px; height: 104px; object-fit: contain; margin: -4px auto 4px; display: block; filter: drop-shadow(0 12px 14px rgba(84, 68, 180, .3)); }
+.login-card h1 { margin: 0; font-size: 28px; }
+.login-card .sub { margin: 4px 0 20px; color: var(--ink-soft); font-size: 17px; }
+.login-card form { text-align: left; display: flex; flex-direction: column; gap: 4px; }
+.login-card .btn-primary { margin-top: 10px; }
+.pass-row { display: flex; gap: 8px; }
+.pass-row input { flex: 1; min-width: 0; }
+.pass-row .btn { flex-shrink: 0; min-height: 54px; }
+.login-help { margin: 16px 0 0; font-size: 16px; color: var(--ink-soft); }
+.login-teacher { font-size: 16px; color: var(--ink-soft); }
+
+/* identify: who is doing the test */
+.known-user { display: flex; align-items: center; gap: 12px; padding: 14px; margin-bottom: 14px; border-radius: 16px; background: var(--accent-soft); }
+.known-avatar { width: 48px; height: 48px; flex-shrink: 0; display: grid; place-items: center; border-radius: 50%; background: var(--grad); color: #fff; font-size: 20px; }
+.known-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.known-text strong { font-size: 20px; overflow-wrap: anywhere; }
+.known-text span { font-size: 16px; color: var(--ink-soft); }
+.known-user .btn { flex-shrink: 0; color: var(--accent); }
+
+/* user chip is a button */
+.user-chip { font: inherit; font-weight: 600; font-size: 15px; color: var(--ink); cursor: pointer; min-height: 48px; }
+.user-chip:hover { border-color: var(--accent-2); }
+.chip-switch { color: var(--accent); font-weight: 700; }
+
+/* ---------- อ่านง่าย กดง่าย: ตัวหนังสือ >= 16px ปุ่ม >= 48px ---------- */
+body.student .btn, body.student .btn-sm, body.student .suggest-btn, body.student .exam-foot .btn,
+body.student .crumb-back, body.student .icon-btn { min-height: 48px; }
+body.student .icon-btn { width: 48px; }
+body.student .nav-card-sub, body.student .nav-card-kicker, body.student .exam-kind, body.student .exam-progress,
+body.student .exam-chips span, body.student .achieve-top, body.student .achieve-top span,
+body.student .suggest-body b, body.student .suggest-body span, body.student .side-card-head p,
+body.student .section-head .muted, body.student .crumbs ol, body.student .cover-badge,
+body.student .review-card span, body.student .site-foot, body.student .image-hint,
+body.student .key-hint, body.student .field .hint, body.student .switch-row .label-text span { font-size: 16px; }
+body.student .suggest-body b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ---------- แถบเมนูล่าง (มือถือ/แท็บเล็ต) ---------- */
+.bottom-nav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+  background: var(--paper);
+  border-top: var(--border);
+  box-shadow: 0 -8px 24px -16px rgba(84, 68, 180, .4);
+}
+.bn-item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 58px; border: 0; border-radius: 14px; background: none;
+  color: var(--ink-soft); font: inherit; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer;
+}
+.bn-item img { width: 30px; height: 30px; object-fit: contain; }
+.bn-item:active, .bn-item:hover { background: var(--accent-soft); color: var(--accent); }
+.bn-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.student { padding-bottom: 86px; }
+body.student.in-quiz, body.student.need-login { padding-bottom: 0; }
+body.in-quiz .bottom-nav { display: none; }
+@media (min-width: 1024px) {
+  .bottom-nav { display: none; }
+  body.student { padding-bottom: 0; }
+}

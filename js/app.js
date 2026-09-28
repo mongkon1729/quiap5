@@ -4,7 +4,8 @@
   var examsData = { exams: [] };
 
   var state = {
-    currentUserName: null,
+    currentUserName: null, // username (key for saved progress)
+    displayName: '',
     selectedExam: null,
     timerEnabled: false,
     mode: 'normal', // 'normal' | 'review'
@@ -68,11 +69,16 @@
     el.screenIdentify = document.getElementById('screen-identify');
     el.identifyExamTitle = document.getElementById('identifyExamTitle');
     el.identifyForm = document.getElementById('identifyForm');
-    el.inputName = document.getElementById('inputName');
-    el.inputPin = document.getElementById('inputPin');
-    el.labelPin = document.getElementById('labelPin');
-    el.pinConfirmWrap = document.getElementById('pinConfirmWrap');
-    el.inputPinConfirm = document.getElementById('inputPinConfirm');
+    el.knownUserName = document.getElementById('knownUserName');
+    el.btnNotMe = document.getElementById('btnNotMe');
+    el.screenLogin = document.getElementById('screen-login');
+    el.loginForm = document.getElementById('loginForm');
+    el.loginUser = document.getElementById('loginUser');
+    el.loginPass = document.getElementById('loginPass');
+    el.loginError = document.getElementById('loginError');
+    el.btnLogin = document.getElementById('btnLogin');
+    el.btnShowPass = document.getElementById('btnShowPass');
+    el.bottomNav = document.getElementById('bottomNav');
     el.toggleTimer = document.getElementById('toggleTimer');
     el.timerHint = document.getElementById('timerHint');
     el.identifyError = document.getElementById('identifyError');
@@ -122,10 +128,11 @@
   }
 
   function showScreen(screenEl) {
-    [el.screenStart, el.screenIdentify, el.screenQuiz, el.screenSummary, el.screenReviewDone].forEach(function (s) {
+    [el.screenLogin, el.screenStart, el.screenIdentify, el.screenQuiz, el.screenSummary, el.screenReviewDone].forEach(function (s) {
       s.hidden = s !== screenEl;
     });
-    document.body.classList.toggle('in-quiz', screenEl !== el.screenStart);
+    document.body.classList.toggle('in-quiz', screenEl !== el.screenStart && screenEl !== el.screenLogin);
+    document.body.classList.toggle('need-login', screenEl === el.screenLogin);
     window.scrollTo(0, 0);
   }
 
@@ -148,9 +155,9 @@
 
   function renderUserChip() {
     el.userChip.hidden = !state.currentUserName;
-    el.userChipName.textContent = state.currentUserName || '';
+    el.userChipName.textContent = state.displayName || '';
     if (state.currentUserName) {
-      el.heroTitle.textContent = 'สวัสดี ' + state.currentUserName;
+      el.heroTitle.textContent = 'สวัสดี ' + state.displayName;
       el.heroSub.textContent = 'ทำได้ดีมาก ฝึกต่ออีกสักชุดไหม';
     }
   }
@@ -370,9 +377,9 @@
   function startReviewOrHint() {
     var n = state.currentUserName ? Storage.getWrongQuestions(state.currentUserName).length : 0;
     if (n > 0) { startReview(); return; }
-    el.sidePromoText.innerHTML = state.currentUserName
-      ? 'ตอนนี้ยังไม่มีข้อที่ตอบผิด<br />เก่งมากเลย'
-      : 'เริ่มทำข้อสอบสักชุดก่อน<br />แล้วข้อที่ผิดจะมารวมตรงนี้';
+    var hint = 'ตอนนี้ยังไม่มีข้อที่ตอบผิด เก่งมากเลย ลองทำชุดใหม่เพิ่มดูนะ';
+    el.sidePromoText.textContent = hint;
+    if (window.matchMedia('(max-width: 1023px)').matches) showConfirm(hint, null, 'ตกลง');
   }
 
   function renderSideColumn() {
@@ -431,6 +438,7 @@
 
   function goToStart() {
     stopTimer();
+    if (!state.currentUserName) { showLogin(); return; }
     renderStartScreen();
     showScreen(el.screenStart);
   }
@@ -444,72 +452,80 @@
     el.timerHint.textContent = 'นับถอยหลังทั้งชุด ' + (exam.timeLimitMinutes || 15) + ' นาที';
     el.identifyForm.reset();
     el.identifyError.hidden = true;
-    el.pinConfirmWrap.hidden = true;
-    el.labelPin.textContent = 'PIN 4 หลัก';
-    if (state.currentUserName) {
-      el.inputName.value = state.currentUserName;
-    }
+    el.knownUserName.textContent = state.displayName;
     showScreen(el.screenIdentify);
-    updatePinModeForName();
-  }
-
-  function updatePinModeForName() {
-    var name = el.inputName.value.trim();
-    if (!name) {
-      el.pinConfirmWrap.hidden = true;
-      el.labelPin.textContent = 'PIN 4 หลัก';
-      return;
-    }
-    var exists = Storage.profileExists(name);
-    if (exists) {
-      el.pinConfirmWrap.hidden = true;
-      el.labelPin.textContent = 'PIN 4 หลัก';
-    } else {
-      el.pinConfirmWrap.hidden = false;
-      el.labelPin.textContent = 'ตั้ง PIN ใหม่ 4 หลัก';
-    }
-  }
-
-  function showIdentifyError(message) {
-    el.identifyError.textContent = message;
-    el.identifyError.hidden = false;
   }
 
   function handleIdentifySubmit(evt) {
     evt.preventDefault();
-    el.identifyError.hidden = true;
-
-    var name = el.inputName.value.trim();
-    var pin = el.inputPin.value.trim();
-
-    if (!name) {
-      showIdentifyError('กรอกเลขที่และชื่อเล่นก่อนนะ');
-      return;
-    }
-    if (!/^[0-9]{4}$/.test(pin)) {
-      showIdentifyError('PIN ต้องเป็นตัวเลข 4 หลักนะ');
-      return;
-    }
-
-    var exists = Storage.profileExists(name);
-    if (!exists) {
-      var pinConfirm = el.inputPinConfirm.value.trim();
-      if (pin !== pinConfirm) {
-        showIdentifyError('PIN ไม่ตรงกัน ลองพิมพ์ใหม่อีกครั้งนะ');
-        return;
-      }
-    }
-
-    var result = Storage.verifyOrCreate(name, pin);
-    if (!result.ok) {
-      showIdentifyError('PIN ไม่ถูกต้องนะ ลองใหม่อีกครั้ง ถ้าจำ PIN ไม่ได้ให้บอกคุณครูช่วยดูให้นะ');
-      return;
-    }
-
-    state.currentUserName = result.profile.displayName;
+    if (!state.currentUserName) { showLogin(); return; }
     state.timerEnabled = el.toggleTimer.checked;
-    renderUserChip();
     startQuiz(state.selectedExam);
+  }
+
+  // ---------- เข้าสู่ระบบ ----------
+
+  function setSignedIn(session) {
+    state.currentUserName = session ? session.username : null;
+    state.displayName = session ? Account.displayName(session) : '';
+    if (session) Storage.ensureProfile(session.username, state.displayName);
+  }
+
+  function showLogin(message) {
+    stopTimer();
+    setSignedIn(null);
+    el.loginForm.reset();
+    el.loginError.hidden = !message;
+    el.loginError.textContent = message || '';
+    showScreen(el.screenLogin);
+    setTimeout(function () { el.loginUser.focus(); }, 50);
+  }
+
+  function handleLogin(evt) {
+    evt.preventDefault();
+    var user = el.loginUser.value.trim();
+    var pass = el.loginPass.value.trim();
+    el.loginError.hidden = true;
+    if (!user || !pass) {
+      el.loginError.textContent = !user ? 'พิมพ์ชื่อผู้ใช้ก่อนนะ' : 'พิมพ์รหัสผ่านก่อนนะ';
+      el.loginError.hidden = false;
+      return;
+    }
+    el.btnLogin.disabled = true;
+    el.btnLogin.textContent = 'กำลังตรวจสอบ...';
+    Account.login(user, pass).then(function (session) {
+      setSignedIn(session);
+      goToStart();
+    }, function (err) {
+      el.loginError.textContent = err.message;
+      el.loginError.hidden = false;
+      el.loginPass.select();
+    }).then(function () {
+      el.btnLogin.disabled = false;
+      el.btnLogin.textContent = 'เข้าสู่ระบบ';
+    });
+  }
+
+  function askLogout() {
+    showConfirm('ออกจากระบบของ "' + state.displayName + '" ไหม คะแนนและข้อที่เคยผิดเก็บไว้ครบ เข้าสู่ระบบใหม่เมื่อไหร่ก็เห็นเหมือนเดิม', function () {
+      Account.logout();
+      el.heroTitle.textContent = 'วันนี้ฝึกทำข้อสอบกันไหม';
+      el.heroSub.textContent = 'เลือกวิชาด้านล่างได้เลย ทำทีละข้อ มีเฉลยให้ทุกข้อ';
+      showLogin();
+    }, 'ออกจากระบบ');
+  }
+
+  function scrollToEl(node) {
+    if (node) node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function onBottomNav(e) {
+    var btn = e.target.closest('[data-bn]');
+    if (!btn) return;
+    var what = btn.dataset.bn;
+    if (what === 'review') startReviewOrHint();
+    else if (what === 'progress') scrollToEl(el.achieveList.closest('.side-card'));
+    else if (what === 'me') askLogout();
   }
 
   // ---------- หน้าทำข้อสอบ ----------
@@ -675,6 +691,7 @@
         state.resolvedInReview++;
         if (state.currentUserName) {
           Storage.removeWrongQuestion(state.currentUserName, entry.examId, question.id);
+          Account.pushProgress();
         }
       }
     }
@@ -713,11 +730,12 @@
     if (attempted === fullTotal && state.currentUserName) {
       Storage.saveBestScore(state.currentUserName, state.selectedExam.id, score, fullTotal);
     }
+    if (state.currentUserName) Account.pushProgress();
 
     if (attempted > 0 && state.currentUserName) {
       ResultSync.submit({
         timestamp: new Date().toISOString(),
-        student: state.currentUserName,
+        student: state.displayName || state.currentUserName,
         examId: state.selectedExam.id,
         examTitle: state.selectedExam.title,
         score: score,
@@ -839,7 +857,9 @@
 
   var pendingConfirmAction = null;
 
-  function showConfirm(message, onOk) {
+  function showConfirm(message, onOk, okLabel) {
+    el.btnConfirmOk.textContent = okLabel || 'ออกเลย';
+    el.btnConfirmCancel.hidden = !onOk;
     el.confirmText.textContent = message;
     pendingConfirmAction = onOk;
     el.confirmModal.hidden = false;
@@ -853,8 +873,17 @@
   // ---------- เริ่มต้นแอป ----------
 
   function bindEvents() {
-    el.inputName.addEventListener('blur', updatePinModeForName);
     el.identifyForm.addEventListener('submit', handleIdentifySubmit);
+    el.loginForm.addEventListener('submit', handleLogin);
+    el.btnShowPass.addEventListener('click', function () {
+      var show = el.loginPass.type === 'password';
+      el.loginPass.type = show ? 'text' : 'password';
+      el.btnShowPass.textContent = show ? 'ซ่อนรหัส' : 'ดูรหัส';
+      el.btnShowPass.setAttribute('aria-pressed', String(show));
+    });
+    el.btnNotMe.addEventListener('click', askLogout);
+    el.userChip.addEventListener('click', askLogout);
+    el.bottomNav.addEventListener('click', onBottomNav);
     el.btnBackToStart.addEventListener('click', goToStart);
 
     el.btnCheck.addEventListener('click', checkAnswer);
@@ -937,6 +966,14 @@
     renderThemeButton();
     ResultSync.flush();
 
+    var session = Account.getSession();
+    setSignedIn(session);
+    if (!session) showLogin();
+    else Account.refreshProgress().then(function (changed) {
+      if (changed === 'signedOut') showLogin('คุณครูเปลี่ยนรหัสผ่านของบัญชีนี้แล้ว เข้าสู่ระบบด้วยรหัสใหม่นะ');
+      else if (changed && !el.screenStart.hidden) renderStartScreen();
+    });
+
     window.addEventListener('hashchange', function () {
       el.searchInput.value = '';
       if (el.screenStart.hidden) return;
@@ -946,7 +983,7 @@
 
     ExamSource.load(function (data) {
       examsData = { exams: data.exams };
-      if (!el.screenStart.hidden) renderStartScreen();
+      if (!el.screenStart.hidden && state.currentUserName) renderStartScreen();
     }, function () {
       el.examList.innerHTML = '<p class="empty-note">โหลดข้อสอบไม่ได้ ลองเช็กอินเทอร์เน็ตแล้วรีเฟรชหน้านี้อีกครั้งนะ</p>';
     });

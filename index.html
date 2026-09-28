@@ -33,10 +33,11 @@
       </label>
       <div class="topbar-right">
         <button id="btnTheme" type="button" class="icon-btn" aria-label="สลับโหมดสว่าง/มืด"></button>
-        <div id="userChip" class="user-chip" hidden>
+        <button id="userChip" type="button" class="user-chip" aria-label="ออกจากระบบ / เปลี่ยนคน" hidden>
           <span class="avatar" aria-hidden="true">★</span>
           <span id="userChipName" class="name"></span>
-        </div>
+          <span class="chip-switch" aria-hidden="true">⇄</span>
+        </button>
       </div>
     </header>
 
@@ -45,6 +46,34 @@
     </div>
 
     <main>
+    <!-- หน้าเข้าสู่ระบบ -->
+    <section id="screen-login" class="screen" hidden>
+      <div class="login-wrap">
+        <div class="login-card">
+          <img class="login-art" src="img/3d/backpack.png" alt="" />
+          <h1>เข้าสู่ระบบ</h1>
+          <p class="sub">ใช้ชื่อผู้ใช้และรหัสผ่านที่ได้จากคุณครู</p>
+          <form id="loginForm" novalidate>
+            <div class="field">
+              <label for="loginUser">ชื่อผู้ใช้</label>
+              <input id="loginUser" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="เช่น p5-12" required />
+            </div>
+            <div class="field">
+              <label for="loginPass">รหัสผ่าน</label>
+              <div class="pass-row">
+                <input id="loginPass" type="password" autocomplete="current-password" inputmode="text" placeholder="••••••" required />
+                <button type="button" id="btnShowPass" class="btn btn-outline btn-sm" aria-pressed="false">ดูรหัส</button>
+              </div>
+            </div>
+            <p id="loginError" class="error-text" role="alert" hidden></p>
+            <button type="submit" id="btnLogin" class="btn btn-primary">เข้าสู่ระบบ</button>
+          </form>
+          <p class="login-help">ลืมรหัสผ่าน? บอกคุณครูให้ตั้งรหัสใหม่ให้นะ</p>
+        </div>
+        <a class="login-teacher" href="teacher.html">สำหรับคุณครู</a>
+      </div>
+    </section>
+
     <!-- หน้าเริ่มต้น -->
     <section id="screen-start" class="screen">
       <div class="hero hero-banner">
@@ -114,20 +143,10 @@
         <p id="identifyExamTitle" class="sub"></p>
 
         <form id="identifyForm" novalidate>
-          <div class="field">
-            <label for="inputName">เลขที่ และชื่อเล่น</label>
-            <input id="inputName" name="name" type="text" required maxlength="30" autocomplete="off" placeholder="เช่น 12 นัท" />
-            <span class="hint">ใช้แบบเดิมทุกครั้ง คะแนนจะได้ไม่ปนกับเพื่อน</span>
-          </div>
-
-          <div class="field">
-            <label for="inputPin" id="labelPin">PIN 4 หลัก</label>
-            <input id="inputPin" name="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" required autocomplete="off" placeholder="••••" />
-          </div>
-
-          <div id="pinConfirmWrap" class="field" hidden>
-            <label for="inputPinConfirm">ยืนยัน PIN อีกครั้ง</label>
-            <input id="inputPinConfirm" name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••" />
+          <div class="known-user">
+            <span class="known-avatar" aria-hidden="true">★</span>
+            <span class="known-text"><strong id="knownUserName"></strong><span>ทำข้อสอบในชื่อนี้</span></span>
+            <button type="button" id="btnNotMe" class="btn btn-ghost btn-sm">ไม่ใช่ฉัน</button>
           </div>
 
           <label class="switch-row" for="toggleTimer">
@@ -214,6 +233,13 @@
     </main>
   </div>
 
+  <nav id="bottomNav" class="bottom-nav" aria-label="เมนูลัด">
+    <a href="#/" class="bn-item" data-bn="home"><img src="img/3d/school.png" alt="" /><span>หน้าแรก</span></a>
+    <button type="button" class="bn-item" data-bn="review"><img src="img/3d/memo.png" alt="" /><span>ทบทวน</span></button>
+    <button type="button" class="bn-item" data-bn="progress"><img src="img/3d/trophy.png" alt="" /><span>ความก้าวหน้า</span></button>
+    <button type="button" class="bn-item" data-bn="me"><img src="img/3d/backpack.png" alt="" /><span>ออกจากระบบ</span></button>
+  </nav>
+
   <div id="imageModal" class="image-modal" hidden>
     <img id="imageModalImg" src="" alt="" />
   </div>
@@ -234,6 +260,7 @@
 <script src="js/art.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/sync.js"></script>
+<script src="js/account.js"></script>
 <script src="js/examsource.js"></script>
 <script src="js/app.js"></script>
 </body>
