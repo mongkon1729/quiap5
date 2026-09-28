@@ -158,48 +158,10 @@
 
   // ---------- เลือกวิชา → บท → เรื่อง → ชุดข้อสอบ ----------
 
-  var SUBJECTS = [
-    { name: 'คณิตศาสตร์', match: /คณิต|^ค$/, icon: '🧮', c1: '#c9d3ff', c2: '#a9b6fb', ink: '#2d3a9c' },
-    { name: 'วิทยาศาสตร์', match: /วิทย|^ว$/, icon: '🔬', c1: '#c8efd9', c2: '#9ed8b6', ink: '#1d6a44' },
-    { name: 'ภาษาไทย', match: /ภาษาไทย|^ท$/, icon: '📖', c1: '#ffd9e1', c2: '#f5a6b8', ink: '#8e2f4a' },
-    { name: 'สังคมศึกษา', match: /สังคม|^ส$/, icon: '🌏', c1: '#fff0bf', c2: '#f7c948', ink: '#6b4800' },
-    { name: 'ภาษาอังกฤษ', match: /อังกฤษ|ต่างประเทศ|english|^ต$|^อ$/i, icon: '🔤', c1: '#e3d8fb', c2: '#c7b3f0', ink: '#5a3a9e' },
-    { name: 'สุขศึกษาและพลศึกษา', match: /สุขศึกษา|พลศึกษา|^พ$/, icon: '⚽', c1: '#ffe0cc', c2: '#f8bb8c', ink: '#8a4516' },
-    { name: 'ศิลปะ', match: /ศิลป|ดนตรี|นาฏ|^ศ$/, icon: '🎨', c1: '#ffd9f0', c2: '#efa6d4', ink: '#86306a' },
-    { name: 'การงานอาชีพ', match: /การงาน|^ง$/, icon: '🛠️', c1: '#dcebf5', c2: '#a8cde6', ink: '#1f5579' }
-  ];
-  var OTHER_THEME = { icon: '📚', c1: '#ece7df', c2: '#d6cfc3', ink: '#4a4552' };
-  var OTHER_UNIT = 'เรื่องอื่นๆ';
-
-  function subjectOf(exam) {
-    var texts = [exam.subject, exam.learningArea].filter(Boolean).map(function (t) { return String(t).trim(); });
-    for (var i = 0; i < SUBJECTS.length; i++) {
-      if (texts.some(function (t) { return SUBJECTS[i].match.test(t); })) return SUBJECTS[i];
-    }
-    return { name: texts[0] || 'วิชาอื่นๆ', icon: OTHER_THEME.icon, c1: OTHER_THEME.c1, c2: OTHER_THEME.c2, ink: OTHER_THEME.ink };
-  }
-
-  // บทใหญ่ = หน่วยการเรียนรู้ ถ้าไม่ได้ใส่ ใช้สาระตามหลักสูตรแกนกลางแทน
-  function unitOf(exam) {
-    var u = String(exam.unit || '').trim() || String(exam.strand || '').split(',')[0].trim();
-    return u || OTHER_UNIT;
-  }
-
-  function lessonOf(exam) {
-    return String(exam.lesson || '').trim();
-  }
-
-  // Groups keep the order exams appear in the data, so the teacher controls the order.
-  function groupBy(list, keyFn) {
-    var order = [];
-    var map = {};
-    list.forEach(function (item) {
-      var k = keyFn(item);
-      if (!map[k]) { map[k] = []; order.push(k); }
-      map[k].push(item);
-    });
-    return order.map(function (k) { return { key: k, items: map[k] }; });
-  }
+  var subjectOf = ExamSource.subjectOf;
+  var unitOf = ExamSource.unitOf;
+  var lessonOf = ExamSource.lessonOf;
+  var groupBy = ExamSource.groupBy;
 
   function readNav() {
     var parts = (window.location.hash.replace(/^#\/?/, '') || '').split('/').map(function (p) {
@@ -212,28 +174,23 @@
     return '#/' + Array.prototype.slice.call(arguments).filter(Boolean).map(encodeURIComponent).join('/');
   }
 
+  function doneOf(exams) {
+    if (!state.currentUserName) return null;
+    return exams.filter(function (e) { return Storage.getBestScore(state.currentUserName, e.id); }).length;
+  }
+
   function progressText(exams) {
-    if (!state.currentUserName) return exams.length + ' ชุด';
-    var done = exams.filter(function (e) { return Storage.getBestScore(state.currentUserName, e.id); }).length;
-    return 'ทำแล้ว ' + done + ' / ' + exams.length + ' ชุด';
+    var done = doneOf(exams);
+    return done === null ? exams.length + ' ชุด' : 'ทำแล้ว ' + done + ' / ' + exams.length + ' ชุด';
   }
 
   function navCard(opts, i) {
-    var a = document.createElement('a');
-    a.className = 'nav-card' + (opts.big ? ' nav-card-big' : '');
-    a.href = opts.href;
-    a.style.animationDelay = (i * 60) + 'ms';
-    a.style.setProperty('--c1', opts.theme.c1);
-    a.style.setProperty('--c2', opts.theme.c2);
-    a.style.setProperty('--c-ink', opts.theme.ink);
-    a.innerHTML =
-      '<span class="nav-card-text">' +
-        (opts.kicker ? '<span class="nav-card-kicker">' + escapeHtml(opts.kicker) + '</span>' : '') +
-        '<span class="nav-card-title">' + escapeHtml(opts.title) + '</span>' +
-        '<span class="nav-card-sub">' + escapeHtml(opts.sub) + '</span>' +
-      '</span>' +
-      '<span class="nav-card-icon" aria-hidden="true">' + opts.icon + '</span>';
-    return a;
+    var done = doneOf(opts.exams);
+    opts.pct = done === null ? null : Math.round(done / opts.exams.length * 100);
+    opts.delay = i * 60;
+    var box = document.createElement('div');
+    box.innerHTML = ExamSource.navCardHtml(opts);
+    return box.firstChild;
   }
 
   function renderCrumbs(items) {
@@ -270,7 +227,7 @@
       el.examList.className = 'nav-grid';
       bySubject.forEach(function (g, i) {
         var t = subjectOf(g.items[0]);
-        el.examList.appendChild(navCard({ href: navHash(g.key), title: g.key, sub: progressText(g.items), icon: t.icon, theme: t, big: true }, i));
+        el.examList.appendChild(navCard({ href: navHash(g.key), title: g.key, sub: progressText(g.items), theme: t, big: true, exams: g.items }, i));
       });
       return;
     }
@@ -288,7 +245,7 @@
           kicker: String(g.items[0].unit || '').trim() ? 'บทที่ ' + (i + 1) : '',
           title: g.key,
           sub: (nLessons ? nLessons + ' เรื่อง • ' : '') + progressText(g.items),
-          icon: theme.icon, theme: theme
+          theme: theme, exams: g.items
         }, i));
       });
       return;
@@ -305,7 +262,7 @@
       lessons.forEach(function (g, i) {
         el.examList.appendChild(navCard({
           href: navHash(subject.key, unit.key, g.key),
-          kicker: 'เรื่องที่ ' + (i + 1), title: g.key, sub: progressText(g.items), icon: theme.icon, theme: theme
+          kicker: 'เรื่องที่ ' + (i + 1), title: g.key, sub: progressText(g.items), theme: theme, exams: g.items
         }, i));
       });
       if (loose.length) appendExamCards(loose, lessons.length ? 'ชุดข้อสอบรวมทั้งบท' : '');

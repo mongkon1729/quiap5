@@ -288,6 +288,73 @@ var ExamSource = (function () {
       });
   }
 
+  // ---------- วิชา → บท → เรื่อง (ใช้ทั้งหน้านักเรียนและหน้าครู) ----------
+
+  var SUBJECTS = [
+    { name: 'คณิตศาสตร์', match: /คณิต|^ค$/, icon: '🧮', c1: '#dfe4ff', c2: '#b4c0fb', ink: '#2d3a9c' },
+    { name: 'วิทยาศาสตร์', match: /วิทย|^ว$/, icon: '🔬', c1: '#d9f3e4', c2: '#a6dcbd', ink: '#1d6a44' },
+    { name: 'ภาษาไทย', match: /ภาษาไทย|^ท$/, icon: '📖', c1: '#ffe3e9', c2: '#f5b3c2', ink: '#8e2f4a' },
+    { name: 'สังคมศึกษา', match: /สังคม|^ส$/, icon: '🌏', c1: '#fff3cc', c2: '#f7d56e', ink: '#6b4800' },
+    { name: 'ภาษาอังกฤษ', match: /อังกฤษ|ต่างประเทศ|english|^ต$|^อ$/i, icon: '🔤', c1: '#ece4fc', c2: '#cdbcf2', ink: '#5a3a9e' },
+    { name: 'สุขศึกษาและพลศึกษา', match: /สุขศึกษา|พลศึกษา|^พ$/, icon: '⚽', c1: '#ffe8d9', c2: '#f8c39c', ink: '#8a4516' },
+    { name: 'ศิลปะ', match: /ศิลป|ดนตรี|นาฏ|^ศ$/, icon: '🎨', c1: '#ffe3f3', c2: '#f0b3da', ink: '#86306a' },
+    { name: 'การงานอาชีพ', match: /การงาน|^ง$/, icon: '🛠️', c1: '#e3f0f8', c2: '#b3d4ea', ink: '#1f5579' }
+  ];
+  var OTHER_UNIT = 'เรื่องอื่นๆ';
+
+  function subjectOf(exam) {
+    var texts = [exam.subject, exam.learningArea].filter(Boolean).map(function (t) { return String(t).trim(); });
+    for (var i = 0; i < SUBJECTS.length; i++) {
+      if (texts.some(function (t) { return SUBJECTS[i].match.test(t); })) return SUBJECTS[i];
+    }
+    return { name: texts[0] || 'วิชาอื่นๆ', icon: '📚', c1: '#f1ede6', c2: '#dcd5ca', ink: '#4a4552' };
+  }
+
+  // บทใหญ่ = หน่วยการเรียนรู้ ถ้าไม่ได้ใส่ ใช้สาระตามหลักสูตรแกนกลางแทน
+  function unitOf(exam) {
+    var u = String(exam.unit || '').trim() || String(exam.strand || '').split(',')[0].trim();
+    return u || OTHER_UNIT;
+  }
+
+  function lessonOf(exam) {
+    return String(exam.lesson || '').trim();
+  }
+
+  // Groups keep the order exams appear in the data, so the teacher controls the order.
+  function groupBy(list, keyFn) {
+    var order = [];
+    var map = {};
+    list.forEach(function (item) {
+      var k = keyFn(item);
+      if (!map[k]) { map[k] = []; order.push(k); }
+      map[k].push(item);
+    });
+    return order.map(function (k) { return { key: k, items: map[k] }; });
+  }
+
+  function escHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  // opts: { href | attrs, theme, icon, kicker, title, sub, pct (0-100 or null), big, delay }
+  function navCardHtml(opts) {
+    var t = opts.theme;
+    var tag = opts.href ? 'a' : 'button';
+    var style = '--c1:' + t.c1 + ';--c2:' + t.c2 + ';--c-ink:' + t.ink + ';animation-delay:' + (opts.delay || 0) + 'ms';
+    return '<' + tag + ' class="nav-card' + (opts.big ? ' nav-card-big' : '') + '" style="' + style + '"' +
+      (opts.href ? ' href="' + escHtml(opts.href) + '"' : ' type="button" ' + (opts.attrs || '')) + '>' +
+      '<span class="nav-card-text">' +
+        (opts.kicker ? '<span class="nav-card-kicker">' + escHtml(opts.kicker) + '</span>' : '') +
+        '<span class="nav-card-title">' + escHtml(opts.title) + '</span>' +
+        '<span class="nav-card-sub">' + escHtml(opts.sub) + '</span>' +
+      '</span>' +
+      '<span class="nav-card-icon" aria-hidden="true">' + (opts.icon || t.icon) + '</span>' +
+      (opts.pct != null ? '<span class="nav-card-meter" aria-hidden="true"><span style="width:' + Math.max(0, Math.min(100, opts.pct)) + '%"></span></span>' : '') +
+      '</' + tag + '>';
+  }
+
   return {
     load: load,
     parseSheet: parseSheet,
@@ -295,6 +362,13 @@ var ExamSource = (function () {
     normalizeDifficulty: normalizeDifficulty,
     DIFFICULTIES: DIFFICULTIES,
     EXAM_TYPES: EXAM_TYPES,
+    SUBJECTS: SUBJECTS,
+    OTHER_UNIT: OTHER_UNIT,
+    subjectOf: subjectOf,
+    unitOf: unitOf,
+    lessonOf: lessonOf,
+    groupBy: groupBy,
+    navCardHtml: navCardHtml,
     isEnabled: function () { return !!sheetsUrl(); }
   };
 })();

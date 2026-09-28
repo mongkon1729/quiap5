@@ -38,6 +38,7 @@
     studentKey: null,
     analysisExamId: null,
     bankExamId: null,
+    bankNav: { subject: '', unit: '', lesson: '' },
     edit: null,
     sheet: null,
     draft: null,
@@ -682,27 +683,88 @@
       var exam = examById(state.bankExamId);
       if (exam) return bankDetail(exam);
     }
-    var html = head('คลังข้อสอบ', state.exams.length + ' ชุด • ' + state.exams.reduce(function (n, e) { return n + e.questions.length; }, 0) + ' ข้อ',
-      SHEETS_URL ? '<button type="button" class="btn btn-sm" data-action="reload-exams">โหลดข้อสอบใหม่</button>' : '');
-    html += sheetPanel();
-    html += '<div class="bank-grid">' + state.exams.map(function (e, i) {
-      var bloom = {};
-      e.questions.forEach(function (q) { if (q.bloom) bloom[q.bloom] = (bloom[q.bloom] || 0) + 1; });
-      return '<article class="bank-card card" style="animation-delay:' + (i * 60) + 'ms"><div class="cover">' + Art.cover(i) + '</div><div class="body">' +
-        '<div class="tags">' + typePill(e.examType) + diffPill(e.difficulty, 'ความยาก ') +
-          (e.grade ? '<span class="pill">' + esc(e.grade) + '</span>' : '') + '</div>' +
-        '<h3>' + esc(e.title) + '</h3>' +
-        '<div class="exam-meta"><span>' + e.questions.length + ' ข้อ</span><span>จับเวลา ' + (e.timeLimitMinutes || 15) + ' นาที</span>' +
-        '<span>' + (e.source === 'sheets' ? 'จาก Google Sheets' : 'จากไฟล์ในเว็บ') + '</span></div>' +
-        metaTable({ subject: e.subject, courseCode: e.courseCode, standard: e.standard, unit: e.unit, lesson: e.lesson, indicators: e.indicators }, false) +
-        '<div class="chips" style="margin:0;gap:6px">' + Object.keys(bloom).map(function (b) {
-          return '<span class="pill">' + esc(b) + ' ' + bloom[b] + '</span>';
-        }).join('') + '</div>' +
-        '<button type="button" class="btn btn-primary" data-action="open-bank" data-exam="' + esc(e.id) + '">ดูข้อสอบและเฉลย</button>' +
-        '</div></article>';
-    }).join('') + '</div>';
-    html += sheetGuide();
-    return html;
+    var ES = ExamSource;
+    var nav = state.bankNav;
+    var bySubject = ES.groupBy(state.exams, function (e) { return ES.subjectOf(e).name; });
+    var subject = bySubject.find(function (g) { return g.key === nav.subject; });
+    var theme = subject ? ES.subjectOf(subject.items[0]) : null;
+    var units = subject ? ES.groupBy(subject.items, ES.unitOf) : [];
+    var unit = units.find(function (g) { return g.key === nav.unit; });
+    var lessons = unit ? ES.groupBy(unit.items.filter(ES.lessonOf), ES.lessonOf) : [];
+    var lesson = lessons.find(function (g) { return g.key === nav.lesson; });
+
+    function countText(exams) {
+      return exams.length + ' ชุด • ' + exams.reduce(function (n, e) { return n + e.questions.length; }, 0) + ' ข้อ';
+    }
+    function navAttrs(s, u, l) {
+      return 'data-action="bank-nav" data-s="' + esc(s || '') + '" data-u="' + esc(u || '') + '" data-l="' + esc(l || '') + '"';
+    }
+    var reload = SHEETS_URL ? '<button type="button" class="btn btn-sm" data-action="reload-exams">โหลดข้อสอบใหม่</button>' : '';
+
+    if (!subject) {
+      var html = head('คลังข้อสอบ', bySubject.length + ' วิชา • ' + countText(state.exams), reload);
+      html += sheetPanel();
+      html += '<div class="nav-grid bank-nav">' + bySubject.map(function (g, i) {
+        return ES.navCardHtml({ attrs: navAttrs(g.key), theme: ES.subjectOf(g.items[0]), title: g.key, sub: countText(g.items), big: true, delay: i * 60 });
+      }).join('') + '</div>';
+      return html + sheetGuide();
+    }
+
+    var trail = [{ label: subject.key, attrs: navAttrs(subject.key) }];
+    if (unit) trail.push({ label: unit.key, attrs: navAttrs(subject.key, unit.key) });
+    if (lesson) trail.push({ label: lesson.key, attrs: navAttrs(subject.key, unit.key, lesson.key) });
+    var backAttrs = trail.length > 1 ? trail[trail.length - 2].attrs : navAttrs();
+    var crumbs = '<nav class="crumbs" aria-label="ตำแหน่งที่อยู่"><button type="button" class="btn btn-sm crumb-back" ' + backAttrs + '>‹ ย้อนกลับ</button>' +
+      '<ol><li><button type="button" class="crumb-link" ' + navAttrs() + '>ทุกวิชา</button></li>' + trail.map(function (t, i) {
+        return i === trail.length - 1 ? '<li aria-current="page">' + esc(t.label) + '</li>'
+          : '<li><button type="button" class="crumb-link" ' + t.attrs + '>' + esc(t.label) + '</button></li>';
+      }).join('') + '</ol></nav>';
+
+    if (!unit) {
+      return head(esc(subject.key), units.length + ' บท • ' + countText(subject.items), reload) + crumbs +
+        '<div class="nav-list">' + units.map(function (g, i) {
+          var n = ES.groupBy(g.items.filter(ES.lessonOf), ES.lessonOf).length;
+          return ES.navCardHtml({
+            attrs: navAttrs(subject.key, g.key), theme: theme, delay: i * 60,
+            kicker: String(g.items[0].unit || '').trim() ? 'บทที่ ' + (i + 1) : '',
+            title: g.key, sub: (n ? n + ' เรื่อง • ' : '') + countText(g.items)
+          });
+        }).join('') + '</div>';
+    }
+
+    if (!lesson) {
+      var loose = unit.items.filter(function (e) { return !ES.lessonOf(e); });
+      return head(esc(unit.key), countText(unit.items), reload) + crumbs +
+        (lessons.length ? '<div class="nav-list">' + lessons.map(function (g, i) {
+          return ES.navCardHtml({
+            attrs: navAttrs(subject.key, unit.key, g.key), theme: theme, delay: i * 60,
+            kicker: 'เรื่องที่ ' + (i + 1), title: g.key, sub: countText(g.items)
+          });
+        }).join('') + '</div>' : '') +
+        (loose.length ? (lessons.length ? '<h3 class="nav-subhead">ชุดข้อสอบรวมทั้งบท</h3>' : '') +
+          '<div class="bank-grid" style="margin-top:14px">' + loose.map(bankCard).join('') + '</div>' : '');
+    }
+
+    return head(esc(lesson.key), countText(lesson.items), reload) + crumbs +
+      '<div class="bank-grid">' + lesson.items.map(bankCard).join('') + '</div>';
+  }
+
+  function bankCard(e) {
+    var i = state.exams.indexOf(e);
+    var bloom = {};
+    e.questions.forEach(function (q) { if (q.bloom) bloom[q.bloom] = (bloom[q.bloom] || 0) + 1; });
+    return '<article class="bank-card card" style="animation-delay:' + ((i % 6) * 60) + 'ms"><div class="cover">' + Art.cover(i) + '</div><div class="body">' +
+      '<div class="tags">' + typePill(e.examType) + diffPill(e.difficulty, 'ความยาก ') +
+        (e.grade ? '<span class="pill">' + esc(e.grade) + '</span>' : '') + '</div>' +
+      '<h3>' + esc(e.title) + '</h3>' +
+      '<div class="exam-meta"><span>' + e.questions.length + ' ข้อ</span><span>จับเวลา ' + (e.timeLimitMinutes || 15) + ' นาที</span>' +
+      '<span>' + (e.source === 'sheets' ? 'จาก Google Sheets' : 'จากไฟล์ในเว็บ') + '</span></div>' +
+      metaTable({ subject: e.subject, courseCode: e.courseCode, standard: e.standard, unit: e.unit, lesson: e.lesson, indicators: e.indicators }, false) +
+      '<div class="chips" style="margin:0;gap:6px">' + Object.keys(bloom).map(function (b) {
+        return '<span class="pill">' + esc(b) + ' ' + bloom[b] + '</span>';
+      }).join('') + '</div>' +
+      '<button type="button" class="btn btn-primary" data-action="open-bank" data-exam="' + esc(e.id) + '">ดูข้อสอบและเฉลย</button>' +
+      '</div></article>';
   }
 
   var EXAM_HEADERS = ['ชุดข้อสอบ', 'วิชา', 'เวลา(นาที)', 'หัวข้อ', 'ตัวชี้วัด', 'Bloom', 'คำถาม', 'ก', 'ข', 'ค', 'ง', 'คำตอบ', 'คำอธิบาย', 'รูปภาพ',
@@ -1100,8 +1162,27 @@
     return String(title).trim() + '|' + String(question).trim();
   }
 
-  function buildDraft(text, filename) {
-    var parsed = ExamImport.parse(text, filename);
+  // ---------- ข้อมูลชุดข้อสอบในหน้านำเข้า ----------
+
+  var GRADES = ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6'];
+
+  // Fills blanks from what the teacher chose in step 1, so the set lands in the right subject/unit/lesson.
+  function prefillDraftExam(e) {
+    var p = state.pick;
+    var areaName = (curriculum.areas.find(function (a) { return a.letter === p.area; }) || {}).name || '';
+    if (!e.title && p.title) e.title = p.title;
+    var known = ExamSource.SUBJECTS.find(function (s) { return s.match.test(e.subject || '') || s.match.test(e.learningArea || ''); });
+    if (!known) known = ExamSource.SUBJECTS.find(function (s) { return s.match.test(p.subject || '') || s.match.test(areaName) || s.match.test(p.area); });
+    if (known) e.subject = known.name;
+    if (!e.grade) e.grade = p.grade || '';
+    if (!e.unit && p.unit) e.unit = p.unit;
+    if (!e.lesson && p.lesson) e.lesson = p.lesson;
+    if (!e.examType && p.examType) e.examType = p.examType;
+    if (!e.courseCode && p.courseCode) e.courseCode = p.courseCode;
+  }
+
+  // Marks questions that already exist so they are skipped; re-run when a set title changes.
+  function flagDraft(d) {
     var existing = {};
     var sheetTitles = {};
     var fileTitles = {};
@@ -1110,18 +1191,58 @@
       e.questions.forEach(function (q) { existing[questionKey(e.title, q.question)] = true; });
     });
     state.exams.forEach(function (e) { if (e.source === 'file') fileTitles[e.title] = true; });
-
-    var newCount = 0;
-    var dupCount = 0;
-    parsed.exams.forEach(function (e) {
+    d.newCount = 0;
+    d.dupCount = 0;
+    d.exams.forEach(function (e) {
       e.appendsTo = !!sheetTitles[e.title];
       e.clashesWithFile = !!fileTitles[e.title];
       e.questions.forEach(function (q) {
         q.duplicate = !!existing[questionKey(e.title, q.question)];
-        if (q.duplicate) dupCount++; else newCount++;
+        if (q.duplicate) d.dupCount++; else d.newCount++;
       });
     });
-    return { text: text, filename: filename || 'ข้อความที่วาง', exams: parsed.exams, issues: parsed.issues, newCount: newCount, dupCount: dupCount };
+    return d;
+  }
+
+  function draftSetForm(e, di) {
+    var ES = ExamSource;
+    function attrs(field) { return 'data-draft="' + di + '" data-field="' + field + '"'; }
+    function options(list, value, blank) {
+      var all = list.slice();
+      if (value && all.indexOf(value) < 0) all.push(value);
+      return (blank ? '<option value="">' + blank + '</option>' : '') + all.map(function (v) {
+        return '<option' + (v === value ? ' selected' : '') + '>' + esc(v) + '</option>';
+      }).join('');
+    }
+    function datalist(id, values) {
+      return '<datalist id="' + id + '">' + values.map(function (v) { return '<option value="' + esc(v) + '"></option>'; }).join('') + '</datalist>';
+    }
+    var sameSubject = state.exams.filter(function (x) { return ES.subjectOf(x).name === ES.subjectOf(e).name; });
+    var units = ES.groupBy(sameSubject.filter(function (x) { return x.unit; }), function (x) { return x.unit; }).map(function (g) { return g.key; });
+    var lessons = ES.groupBy(sameSubject.filter(function (x) { return x.lesson && (!e.unit || x.unit === e.unit); }), function (x) { return x.lesson; }).map(function (g) { return g.key; });
+    var subjectNames = ES.SUBJECTS.map(function (s) { return s.name; });
+    var subjectValue = subjectNames.indexOf(e.subject) >= 0 ? e.subject : (ES.subjectOf(e).name);
+
+    return '<div class="draft-set"><h3>ข้อมูลชุดข้อสอบ</h3>' +
+      '<p class="note" style="margin:0 0 10px">นักเรียนจะเห็นชุดนี้ใน <b>' + esc(subjectValue || 'วิชา') + ' › ' + esc(e.unit || ES.unitOf(e)) + (e.lesson ? ' › ' + esc(e.lesson) : '') + '</b></p>' +
+      '<div class="pick-fields">' +
+        '<label class="pick-field"><span>ชื่อชุด</span><input type="text" ' + attrs('title') + ' value="' + esc(e.title) + '" /></label>' +
+        '<label class="pick-field"><span>รายวิชา</span><select ' + attrs('subject') + ' data-rerender="1">' + options(subjectNames, subjectValue, 'เลือกวิชา') + '</select></label>' +
+        '<label class="pick-field"><span>ระดับชั้น</span><select ' + attrs('grade') + '>' + options(GRADES, e.grade, 'เลือกชั้น') + '</select></label>' +
+        '<label class="pick-field"><span>ประเภทการสอบ</span><select ' + attrs('examType') + '>' + options(ES.EXAM_TYPES, e.examType, 'ไม่ระบุ') + '</select></label>' +
+        '<label class="pick-field"><span>หน่วยการเรียนรู้ (บท)</span><input type="text" list="dlUnit' + di + '" ' + attrs('unit') + ' data-rerender="1" value="' + esc(e.unit || '') + '" placeholder="เช่น เศษส่วน" />' + datalist('dlUnit' + di, units) + '</label>' +
+        '<label class="pick-field"><span>เรื่อง</span><input type="text" list="dlLesson' + di + '" ' + attrs('lesson') + ' data-rerender="1" value="' + esc(e.lesson || '') + '" placeholder="เช่น การบวกเศษส่วน" />' + datalist('dlLesson' + di, lessons) + '</label>' +
+        '<label class="pick-field"><span>รหัสวิชา</span><input type="text" ' + attrs('courseCode') + ' value="' + esc(e.courseCode || '') + '" placeholder="เช่น ค15101" /></label>' +
+        '<label class="pick-field"><span>เวลา (นาที)</span><input type="number" min="1" ' + attrs('minutes') + ' value="' + esc(e.minutes || '') + '" placeholder="ว่างไว้ = คิดให้อัตโนมัติ" /></label>' +
+      '</div>' +
+      (units.length || lessons.length ? '<p class="note" style="margin:0">พิมพ์ช่องบทหรือเรื่องแล้วจะมีชื่อเดิมในวิชานี้ให้เลือก ใช้ชื่อเดียวกันเพื่อรวมไว้ในบทเดียวกัน</p>' : '') +
+      '</div>';
+  }
+
+  function buildDraft(text, filename) {
+    var parsed = ExamImport.parse(text, filename);
+    parsed.exams.forEach(prefillDraftExam);
+    return flagDraft({ text: text, filename: filename || 'ข้อความที่วาง', exams: parsed.exams, issues: parsed.issues });
   }
 
   function renderImport() {
@@ -1256,7 +1377,7 @@
       html += '<p class="error-text">ไม่พบข้อสอบในไฟล์นี้ ลองดูว่ารูปแบบตรงกับไฟล์ตัวอย่างไหม</p>';
     }
 
-    html += d.exams.map(function (e) {
+    html += d.exams.map(function (e, di) {
       var fresh = e.questions.filter(function (q) { return !q.duplicate; }).length;
       var notes = [];
       if (e.appendsTo) notes.push('<span class="pill pill-blue">เพิ่มต่อท้ายชุดเดิมใน Sheets</span>');
@@ -1265,9 +1386,10 @@
       if (fresh < e.questions.length) notes.push('<span class="pill">ข้ามข้อที่มีอยู่แล้ว ' + (e.questions.length - fresh) + ' ข้อ</span>');
       var bad = unknownIndicators(e.questions);
       if (bad.length) notes.push('<span class="pill pill-peach">ตัวชี้วัดไม่พบในหลักสูตร: ' + esc(bad.join(', ')) + '</span>');
-      return '<details class="draft-exam"' + (d.exams.length === 1 ? ' open' : '') + '><summary><span class="draft-title"><b>' + esc(e.title) + '</b> • ' + fresh + ' ข้อใหม่' +
+      return '<details class="draft-exam"' + (d.exams.length <= 3 ? ' open' : '') + '><summary><span class="draft-title"><b>' + esc(e.title) + '</b> • ' + fresh + ' ข้อใหม่' +
         (e.grade ? ' • ' + esc(e.grade) : '') + (e.minutes ? ' • ' + e.minutes + ' นาที' : '') + '</span>' +
         '<span class="draft-tags">' + notes.join('') + '</span></summary>' +
+        draftSetForm(e, di) +
         '<div class="draft-meta">' + metaTable(e, true) + '</div>' +
         '<div class="q-list" style="margin-top:12px">' +
         e.questions.map(function (q, qi) {
@@ -1324,6 +1446,7 @@
   function commitImport() {
     var d = state.draft;
     var key = lsGet(KEY_STORE);
+    if (d) flagDraft(d);
     if (!d || !d.newCount) return;
     if (!key) { state.importMsg = { kind: 'bad', text: 'ยังไม่ได้ใส่รหัสครูในเครื่องนี้ ไปที่ตั้งค่าแล้วกรอกรหัสครูก่อน' }; render(); return; }
 
@@ -1573,6 +1696,11 @@
     else if (a === 'close-student') { state.studentKey = null; render(); }
     else if (a === 'pick-analysis') { state.analysisExamId = t.dataset.exam; render(); }
     else if (a === 'open-bank') { state.bankExamId = t.dataset.exam; state.edit = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    else if (a === 'bank-nav') {
+      state.bankNav = { subject: t.dataset.s || '', unit: t.dataset.u || '', lesson: t.dataset.l || '' };
+      render();
+      window.scrollTo(0, 0);
+    }
     else if (a === 'close-bank') { state.bankExamId = null; state.edit = null; render(); }
     else if (a === 'edit-q') startEdit(t.dataset.qid);
     else if (a === 'cancel-edit') { state.edit = null; render(); }
@@ -1600,6 +1728,10 @@
   }
 
   function onInput(e) {
+    if (e.target.dataset && e.target.dataset.draft && state.draft) {
+      state.draft.exams[Number(e.target.dataset.draft)][e.target.dataset.field] = e.target.value.trim();
+      return;
+    }
     if (e.target.dataset && e.target.dataset.pick) {
       state.pick[e.target.dataset.pick] = e.target.value;
       return;
@@ -1684,6 +1816,16 @@
     document.addEventListener('change', function (e) {
       if (e.target.id === 'importFile') readImportFile(e.target.files[0]);
       if (e.target.id === 'edImageFile') uploadEditImage(e.target.files[0]);
+      if (e.target.dataset.draft && state.draft) {
+        state.draft.exams[Number(e.target.dataset.draft)][e.target.dataset.field] = e.target.value.trim();
+        if (e.target.dataset.rerender || e.target.dataset.field === 'title') {
+          flagDraft(state.draft);
+          var keepY = window.scrollY;
+          render();
+          window.scrollTo(0, keepY);
+        }
+        return;
+      }
       if (e.target.dataset.pick) {
         state.pick[e.target.dataset.pick] = e.target.value;
         if (e.target.dataset.rerender) {
