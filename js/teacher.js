@@ -2,7 +2,7 @@
   'use strict';
 
   var KEY_STORE = 'quizapp_teacher_key_v1';
-  var SCRIPT_VERSION = 7;
+  var SCRIPT_VERSION = 8;
   var SHEETS_URL = (window.QUIZ_CONFIG && window.QUIZ_CONFIG.sheetsUrl || '').trim();
   var LETTERS = ['ก', 'ข', 'ค', 'ง'];
 
@@ -47,7 +47,7 @@
     importMsg: null,
     pick: { area: 'ส', grade: 'ป.5', touched: false, codes: {}, title: '', subject: '', courseCode: '', unit: '', lesson: '', examType: '', count: '10' },
     importing: false,
-    accounts: { list: null, loading: false, msg: null, draft: null, room: 'p5', paste: '', showPass: false, busy: false },
+    accounts: { list: null, loading: false, msg: null, draft: null, room: 'p5', paste: '', showPass: false, busy: false, editing: null, edit: null },
     studentQuery: '',
     scriptText: null,
     stats: null
@@ -1917,15 +1917,18 @@
     a.paste.split(/\r?\n/).forEach(function (line, i) {
       var t = arabicDigits(line).trim();
       if (!t) return;
-      var m = t.match(/^(\d{1,3})[\s.,\t)-]+(.+)$/);
-      if (!m) { issues.push('บรรทัด ' + (i + 1) + ': ใส่เลขที่นำหน้าชื่อด้วย เช่น "12 นัท"'); return; }
+      // from Excel: เลขที่ | ชื่อ | ชื่อผู้ใช้ | รหัสผ่าน (the last two are optional)
+      var cols = t.indexOf('\t') >= 0 ? t.split('\t').map(function (c) { return c.trim(); }) : null;
+      var m = cols ? [null, cols[0], cols[1]] : t.match(/^(\d{1,3})[\s.,)-]+(.+)$/);
+      if (!m || !/^\d{1,3}$/.test(m[1] || '') || !m[2]) { issues.push('บรรทัด ' + (i + 1) + ': ใส่เลขที่นำหน้าชื่อด้วย เช่น "12 นัท"'); return; }
       var num = String(parseInt(m[1], 10));
-      var name = m[2].replace(/\t/g, ' ').trim();
-      var username = (room ? room + '-' : '') + num;
-      if (used[username]) { issues.push('บรรทัด ' + (i + 1) + ': เลขที่ ' + num + ' ซ้ำ'); return; }
-      used[username] = true;
-      var old = have[username];
-      rows.push({ username: username, password: old ? '' : randomPassword(), number: num, name: name, room: a.room.trim(), exists: !!old });
+      var name = m[2].trim();
+      var username = (cols && cols[2]) || ((room ? room + '-' : '') + num);
+      var key = username.toLowerCase();
+      if (used[key]) { issues.push('บรรทัด ' + (i + 1) + ': ชื่อผู้ใช้ ' + username + ' ซ้ำกับบรรทัดก่อนหน้า'); return; }
+      used[key] = true;
+      var old = have[key];
+      rows.push({ username: username, password: (cols && cols[3]) || (old ? '' : randomPassword()), number: num, name: name, room: a.room.trim(), exists: !!old });
     });
     a.draft = { rows: rows, issues: issues };
   }
@@ -1964,7 +1967,8 @@
 
     // add a class
     html += '<div class="panel card block no-print"><div class="block-head"><h2>เพิ่มนักเรียนทั้งห้อง</h2></div>' +
-      '<p class="note" style="margin-top:0">คัดลอกคอลัมน์ <b>เลขที่</b> และ <b>ชื่อ</b> จาก Excel มาวาง บรรทัดละ 1 คน ระบบจะตั้งชื่อผู้ใช้เป็น <b>รหัสห้อง-เลขที่</b> และสุ่มรหัสผ่านตัวเลข 6 หลักให้</p>' +
+      '<p class="note" style="margin-top:0">คัดลอกคอลัมน์ <b>เลขที่</b> และ <b>ชื่อ</b> จาก Excel มาวาง บรรทัดละ 1 คน ระบบจะตั้งชื่อผู้ใช้เป็น <b>รหัสห้อง-เลขที่</b> และสุ่มรหัสผ่านตัวเลข 6 หลักให้ ' +
+        'ถ้าอยากตั้งเอง ให้คัดลอก 4 คอลัมน์ <b>เลขที่ | ชื่อ | ชื่อผู้ใช้ | รหัสผ่าน</b> มาวางแทน หรือกด "สร้างบัญชี" แล้วแก้ในตารางก็ได้</p>' +
       '<div class="pick-fields"><label class="pick-field"><span>รหัสห้อง (ใช้นำหน้าชื่อผู้ใช้)</span><input id="accRoom" type="text" value="' + esc(a.room) + '" placeholder="เช่น p5 หรือ p5-1" /></label></div>' +
       '<textarea id="accPaste" class="import-text" placeholder="1 กานต์&#10;2 ข้าวหอม&#10;3 จิรายุ">' + esc(a.paste) + '</textarea>' +
       '<div class="btn-row" style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" data-action="acc-preview">สร้างบัญชี</button></div>';
@@ -1973,10 +1977,13 @@
       html += '<div class="acc-draft">' +
         (a.draft.issues.length ? '<div class="error-text"><ul style="margin:0;padding-left:20px">' + a.draft.issues.map(function (m) { return '<li>' + esc(m) + '</li>'; }).join('') + '</ul></div>' : '') +
         (a.draft.rows.length ? '<div class="table-wrap"><table class="plain"><thead><tr><th>เลขที่</th><th>ชื่อ</th><th>ชื่อผู้ใช้</th><th>รหัสผ่าน</th></tr></thead><tbody>' +
-          a.draft.rows.map(function (r) {
-            return '<tr><td class="num">' + esc(r.number) + '</td><td>' + esc(r.name) + '</td><td><code>' + esc(r.username) + '</code></td><td>' +
-              (r.exists ? '<span class="pill">มีบัญชีแล้ว (อัปเดตชื่อ รหัสเดิม)</span>' : '<code>' + esc(r.password) + '</code>') + '</td></tr>';
+          a.draft.rows.map(function (r, ri) {
+            return '<tr><td class="num">' + esc(r.number) + '</td><td>' + esc(r.name) + '</td>' +
+              '<td><input class="acc-input" data-acc-draft="' + ri + '" data-field="username" value="' + esc(r.username) + '" aria-label="ชื่อผู้ใช้ของ ' + esc(r.name) + '" autocapitalize="none" spellcheck="false" /></td>' +
+              '<td><input class="acc-input" data-acc-draft="' + ri + '" data-field="password" value="' + esc(r.password) + '" placeholder="' + (r.exists ? 'เว้นว่าง = ใช้รหัสเดิม' : 'อย่างน้อย 4 ตัว') + '" aria-label="รหัสผ่านของ ' + esc(r.name) + '" autocapitalize="none" spellcheck="false" />' +
+              (r.exists ? '<div class="acc-hint">มีบัญชีนี้แล้ว จะอัปเดตข้อมูล</div>' : '') + '</td></tr>';
           }).join('') + '</tbody></table></div>' +
+          '<p class="note">แก้ชื่อผู้ใช้และรหัสผ่านในตารางได้เลย ใช้ตัวอักษรอังกฤษ ตัวเลข หรือภาษาไทยก็ได้ แต่ห้ามมีเว้นวรรค และรหัสผ่านต้องมีอย่างน้อย 4 ตัว</p>' +
           '<div class="btn-row" style="margin-top:12px"><button type="button" class="btn btn-primary" data-action="acc-save"' + (a.busy ? ' disabled' : '') + '>' +
             (a.busy ? 'กำลังบันทึก...' : 'บันทึก ' + a.draft.rows.length + ' บัญชี' + (fresh < a.draft.rows.length ? ' (ใหม่ ' + fresh + ')' : '')) + '</button>' +
             '<button type="button" class="btn btn-ghost btn-sm" data-action="acc-cancel">ยกเลิก</button></div>' : '') +
@@ -1994,14 +2001,58 @@
       '<button type="button" class="btn btn-ghost btn-sm no-print" data-action="acc-toggle-pass">' + (a.showPass ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน') + '</button></div>' +
       '<div class="table-wrap"><table class="plain acc-table"><thead><tr><th>ห้อง</th><th>เลขที่</th><th>ชื่อ</th><th>ชื่อผู้ใช้</th><th>รหัสผ่าน</th><th>ใช้ล่าสุด</th><th class="no-print"></th></tr></thead><tbody>' +
       sorted.map(function (st) {
+        if (a.editing === st.username) return accountEditRow(st);
         return '<tr><td>' + esc(st.room) + '</td><td class="num">' + esc(st.number) + '</td><td>' + esc(st.name) + '</td><td><code>' + esc(st.username) + '</code></td>' +
           '<td><code>' + (a.showPass ? esc(st.password) : '••••••') + '</code></td>' +
           '<td class="num">' + (st.lastSeen ? esc(whenText(new Date(st.lastSeen).getTime())) : '-') + '</td>' +
-          '<td class="no-print acc-actions"><button type="button" class="btn btn-sm" data-action="acc-reset" data-user="' + esc(st.username) + '"' + (a.busy ? ' disabled' : '') + '>ตั้งรหัสใหม่</button>' +
+          '<td class="no-print acc-actions"><button type="button" class="btn btn-sm" data-action="acc-edit" data-user="' + esc(st.username) + '"' + (a.busy ? ' disabled' : '') + '>แก้ไข</button>' +
+          '<button type="button" class="btn btn-sm" data-action="acc-reset" data-user="' + esc(st.username) + '"' + (a.busy ? ' disabled' : '') + '>ตั้งรหัสใหม่</button>' +
           '<button type="button" class="btn btn-ghost btn-sm ed-delete" data-action="acc-delete" data-user="' + esc(st.username) + '"' + (a.busy ? ' disabled' : '') + '>ลบ</button></td></tr>';
       }).join('') + '</tbody></table></div>' +
-      '<p class="note">นักเรียนลืมรหัส: กด "ตั้งรหัสใหม่" แล้วบอกรหัสใหม่ เครื่องที่เคยเข้าไว้จะต้องเข้าสู่ระบบใหม่ ส่วนคะแนนและข้อที่เคยผิดยังอยู่ครบ</p></div>';
+      '<p class="note">กด "แก้ไข" เพื่อตั้งชื่อผู้ใช้หรือรหัสผ่านเอง • นักเรียนลืมรหัส: กด "ตั้งรหัสใหม่" แล้วบอกรหัสใหม่ เครื่องที่เคยเข้าไว้จะต้องเข้าสู่ระบบใหม่ ส่วนคะแนนและข้อที่เคยผิดยังอยู่ครบ</p></div>';
     return html;
+  }
+
+  function accountEditRow(st) {
+    var e = state.accounts.edit;
+    function input(field, label, extra) {
+      return '<input class="acc-input" data-acc-edit="' + field + '" value="' + esc(e[field]) + '" aria-label="' + label + '" autocapitalize="none" spellcheck="false"' + (extra || '') + ' />';
+    }
+    return '<tr class="acc-editing"><td>' + input('room', 'ห้อง') + '</td><td>' + input('number', 'เลขที่') + '</td>' +
+      '<td>' + input('name', 'ชื่อ') + '</td><td>' + input('username', 'ชื่อผู้ใช้') + '</td><td>' + input('password', 'รหัสผ่าน') + '</td><td></td>' +
+      '<td class="no-print acc-actions"><button type="button" class="btn btn-sm btn-primary" data-action="acc-edit-save">บันทึก</button>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-action="acc-edit-cancel">ยกเลิก</button>' +
+      (e.error ? '<div class="acc-hint bad">' + esc(e.error) + '</div>' : '') + '</td></tr>';
+  }
+
+  // same rules for new accounts and edits; returns a message or ''
+  function accountProblem(username, password, ignoreUser, isNew) {
+    if (!username) return 'ใส่ชื่อผู้ใช้ก่อน';
+    if (/\s/.test(username)) return 'ชื่อผู้ใช้ ' + username + ' มีเว้นวรรค ใช้ขีด (-) แทนได้';
+    if (username.length > 40) return 'ชื่อผู้ใช้ยาวเกิน 40 ตัว';
+    if ((isNew || password) && password.length < 4) return 'รหัสผ่านของ ' + username + ' ต้องมีอย่างน้อย 4 ตัว';
+    var key = username.toLowerCase();
+    var clash = (state.accounts.list || []).some(function (x) {
+      return String(x.username).toLowerCase() === key && String(x.username).toLowerCase() !== String(ignoreUser || '').toLowerCase();
+    });
+    if (clash && ignoreUser !== undefined) return 'ชื่อผู้ใช้ ' + username + ' มีคนใช้แล้ว';
+    return '';
+  }
+
+  function saveAccountEdit() {
+    var a = state.accounts;
+    var e = a.edit;
+    var username = e.username.trim();
+    var password = e.password.trim();
+    e.error = accountProblem(username, password, a.editing, false);
+    if (e.error) { render(); return; }
+    var old = a.editing;
+    saveAccounts([{ oldUsername: old, username: username, password: password, number: e.number.trim(), name: e.name.trim(), room: e.room.trim() }], function (reply) {
+      if (reply.taken && reply.taken.length) return 'ชื่อผู้ใช้ ' + reply.taken.join(', ') + ' มีคนใช้แล้ว ยังไม่ได้เปลี่ยน';
+      a.editing = null;
+      a.edit = null;
+      return 'บันทึกบัญชี ' + username + ' แล้ว' + (old.toLowerCase() !== username.toLowerCase() ? ' นักเรียนต้องเข้าสู่ระบบใหม่ด้วยชื่อผู้ใช้ ' + username : '');
+    });
   }
 
   function resetAccountPassword(username) {
@@ -2195,9 +2246,31 @@
     else if (a === 'acc-preview') { state.accounts.room = $('accRoom').value; state.accounts.paste = $('accPaste').value; buildAccountDraft(); render(); }
     else if (a === 'acc-cancel') { state.accounts.draft = null; render(); }
     else if (a === 'acc-save') {
-      var rows = state.accounts.draft.rows.map(function (r) { return { username: r.username, password: r.password, number: r.number, name: r.name, room: r.room }; });
+      var d = state.accounts.draft;
+      var seen = {};
+      var bad = [];
+      d.rows.forEach(function (r) {
+        r.username = String(r.username || '').trim();
+        r.password = String(r.password || '').trim();
+        var key = r.username.toLowerCase();
+        r.exists = (state.accounts.list || []).some(function (x) { return String(x.username).toLowerCase() === key; });
+        var p = accountProblem(r.username, r.password, undefined, !r.exists);
+        if (!p && seen[key]) p = 'ชื่อผู้ใช้ ' + r.username + ' ซ้ำกันในตาราง';
+        seen[key] = true;
+        if (p) bad.push(p);
+      });
+      if (bad.length) { d.issues = bad; render(); return; }
+      var rows = d.rows.map(function (r) { return { username: r.username, password: r.password, number: r.number, name: r.name, room: r.room }; });
       saveAccounts(rows, function (reply) { return 'บันทึกแล้ว เพิ่มใหม่ ' + reply.added + ' คน อัปเดต ' + reply.updated + ' คน กด "พิมพ์บัตรเข้าระบบ" เพื่อแจกนักเรียนได้เลย'; });
     }
+    else if (a === 'acc-edit') {
+      var st = (state.accounts.list || []).find(function (x) { return x.username === t.dataset.user; });
+      state.accounts.editing = st.username;
+      state.accounts.edit = { username: st.username, password: st.password || '', number: st.number || '', name: st.name || '', room: st.room || '', error: '' };
+      render();
+    }
+    else if (a === 'acc-edit-cancel') { state.accounts.editing = null; state.accounts.edit = null; render(); }
+    else if (a === 'acc-edit-save') saveAccountEdit();
     else if (a === 'acc-toggle-pass') { state.accounts.showPass = !state.accounts.showPass; render(); }
     else if (a === 'acc-reset') resetAccountPassword(t.dataset.user);
     else if (a === 'acc-delete') deleteAccount(t.dataset.user);
@@ -2215,6 +2288,14 @@
   }
 
   function onInput(e) {
+    if (e.target.dataset && e.target.dataset.accDraft && state.accounts.draft) {
+      state.accounts.draft.rows[Number(e.target.dataset.accDraft)][e.target.dataset.field] = e.target.value;
+      return;
+    }
+    if (e.target.dataset && e.target.dataset.accEdit && state.accounts.edit) {
+      state.accounts.edit[e.target.dataset.accEdit] = e.target.value;
+      return;
+    }
     if (e.target.dataset && e.target.dataset.mg && state.manage) {
       var u = state.manage.units[Number(e.target.dataset.i)];
       if (e.target.dataset.mg === 'unit') u.name = e.target.value; else u.lessons[Number(e.target.dataset.j)].name = e.target.value;

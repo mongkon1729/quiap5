@@ -694,3 +694,15 @@ body.teacher {
 .mg-arrows .icon-btn:disabled { opacity: .3; cursor: default; }
 .mg-sets { flex-shrink: 0; font-size: 13px; color: var(--ink-soft); }
 @media (max-width: 600px) { .mg-lessons { margin-left: 8px; } .mg-no { min-width: 0; } .mg-sets { display: none; } }
+
+.acc-input { width: 100%; min-width: 90px; min-height: 40px; padding: 4px 10px; border: var(--border); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; font-size: 15px; }
+.acc-input:focus { outline: none; border-color: var(--accent-2); box-shadow: 0 0 0 3px var(--accent-soft); }
+.acc-hint { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+.acc-hint.bad { color: var(--wrong-ink); font-size: 13px; white-space: normal; }
+tr.acc-editing td { background: var(--accent-soft); }
+tr.acc-editing .acc-input { min-width: 0; }
+tr.acc-editing td { padding-left: 4px; padding-right: 4px; }
+tr.acc-editing td:nth-child(1), tr.acc-editing td:nth-child(2) { width: 64px; }
+tr.acc-editing td:nth-child(3), tr.acc-editing td:nth-child(4), tr.acc-editing td:nth-child(5) { min-width: 96px; }
+tr.acc-editing .acc-actions { white-space: normal; }
+tr.acc-editing .acc-actions .btn { width: 100%; margin: 0 0 4px; }
