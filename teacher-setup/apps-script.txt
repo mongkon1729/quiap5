@@ -10,7 +10,7 @@ var EXAM_SHEET_NAME = 'ข้อสอบ';
 var EXAM_HEADERS = ['ชุดข้อสอบ', 'วิชา', 'เวลา(นาที)', 'หัวข้อ', 'ตัวชี้วัด', 'Bloom', 'คำถาม',
   'ก', 'ข', 'ค', 'ง', 'คำตอบ', 'คำอธิบาย', 'รูปภาพ',
   'ความยาก', 'ระดับชั้น', 'กลุ่มสาระ', 'รหัสวิชา', 'สาระ', 'มาตรฐาน',
-  'หน่วยการเรียนรู้', 'เรื่อง', 'ประเภทการสอบ', 'ความยากของชุด'];
+  'หน่วยการเรียนรู้', 'เรื่อง', 'ประเภทการสอบ', 'ความยากของชุด', 'สถานะ'];
 
 // Adds any missing columns to the right of the header row, so older sheets keep working.
 function examHeaders_(sheet, wanted) {
@@ -332,12 +332,41 @@ function deleteStudent_(data) {
   }
 }
 
+// data: { title, status: 'ร่าง' | 'เผยแพร่' } — sets the status on every row of that set
+function setExamStatus_(data) {
+  if (data.key !== TEACHER_KEY) return json_({ ok: false, error: 'unauthorized' });
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sheet = getExamSheet_();
+    var header = examHeaders_(sheet, ['สถานะ']);
+    var titleCol = header.indexOf('ชุดข้อสอบ');
+    var statusCol = header.indexOf('สถานะ');
+    var questionCol = header.indexOf('คำถาม');
+    var values = readExams_();
+    var status = data.status === 'ร่าง' ? 'ร่าง' : 'เผยแพร่';
+    var lastTitle = '';
+    var count = 0;
+    for (var r = 1; r < values.length; r++) {
+      lastTitle = values[r][titleCol] || lastTitle;
+      if (lastTitle === data.title && values[r][questionCol]) {
+        sheet.getRange(r + 1, statusCol + 1).setNumberFormat('@').setValue(status);
+        count++;
+      }
+    }
+    return json_({ ok: true, rows: count });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function doPost(e) {
   var data = JSON.parse(e.postData.contents);
   if (data.action === 'importExams') return importExams_(data);
   if (data.action === 'updateQuestion') return updateQuestion_(data);
   if (data.action === 'deleteQuestion') return deleteQuestion_(data);
   if (data.action === 'uploadImage') return uploadImage_(data);
+  if (data.action === 'setExamStatus') return setExamStatus_(data);
   if (data.action === 'studentLogin') return studentLogin_(data);
   if (data.action === 'studentProgress') return studentProgress_(data);
   if (data.action === 'saveProgress') return saveProgress_(data);

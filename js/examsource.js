@@ -16,6 +16,7 @@ var ExamSource = (function () {
     lesson: ['เรื่อง', 'lesson'],
     examType: ['ประเภทการสอบ', 'ประเภท', 'exam_type'],
     examDifficulty: ['ความยากของชุด', 'exam_difficulty'],
+    status: ['สถานะ', 'status'],
     difficulty: ['ความยาก', 'difficulty'],
     minutes: ['เวลา(นาที)', 'เวลา', 'นาที', 'minutes', 'time_limit'],
     topic: ['หัวข้อ', 'topic'],
@@ -141,7 +142,7 @@ var ExamSource = (function () {
     return { exams: order, issues: issues };
   }
 
-  var SET_FIELDS = ['subject', 'grade', 'learningArea', 'courseCode', 'strand', 'standard', 'unit', 'lesson', 'examType', 'examDifficulty'];
+  var SET_FIELDS = ['subject', 'grade', 'learningArea', 'courseCode', 'strand', 'standard', 'unit', 'lesson', 'examType', 'examDifficulty', 'status'];
 
   var LEARNING_AREAS = {
     'ท': 'ภาษาไทย', 'ค': 'คณิตศาสตร์', 'ว': 'วิทยาศาสตร์และเทคโนโลยี', 'ส': 'สังคมศึกษา ศาสนา และวัฒนธรรม',
@@ -176,6 +177,8 @@ var ExamSource = (function () {
 
   // Fills set-level curriculum info from the questions' indicators when the teacher left it blank.
   function enrich(exam) {
+    // a set marked "ร่าง" is hidden from students until the teacher publishes it
+    exam.status = /ร่าง|draft|ซ่อน/i.test(String(exam.status || '')) ? 'draft' : 'published';
     var standards = [];
     var indicators = [];
     var parts = null;

@@ -290,6 +290,7 @@ var ExamImport = (function () {
           'รูปภาพ': q.image
         };
         if (i === 0) {
+          if (!e.appendsTo) r['สถานะ'] = 'ร่าง';
           r['วิชา'] = e.subject;
           r['เวลา(นาที)'] = e.minutes ? String(e.minutes) : '';
           r['ระดับชั้น'] = e.grade;

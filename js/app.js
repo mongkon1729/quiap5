@@ -982,7 +982,7 @@
     });
 
     ExamSource.load(function (data) {
-      examsData = { exams: data.exams };
+      examsData = { exams: data.exams.filter(function (e) { return e.status !== 'draft'; }) };
       if (!el.screenStart.hidden && state.currentUserName) renderStartScreen();
     }, function () {
       el.examList.innerHTML = '<p class="empty-note">โหลดข้อสอบไม่ได้ ลองเช็กอินเทอร์เน็ตแล้วรีเฟรชหน้านี้อีกครั้งนะ</p>';

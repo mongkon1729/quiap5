@@ -765,7 +765,8 @@
     var chips = [e.lesson || e.unit, e.difficulty, e.grade].filter(Boolean);
     var where = [e.courseCode, e.indicators && e.indicators.length ? 'ตัวชี้วัด ' + e.indicators.join(', ') : ''].filter(Boolean).join(' • ');
     return '<article class="exam-card" style="animation-delay:' + ((i % 6) * 60) + 'ms">' +
-      '<div class="cover">' + Art.cover(i, theme.img || theme.icon) + '<span class="cover-badge">' + e.questions.length + ' ข้อ</span></div>' +
+      '<div class="cover">' + Art.cover(i, theme.img || theme.icon) + '<span class="cover-badge">' + e.questions.length + ' ข้อ</span>' +
+        (e.status === 'draft' ? '<span class="draft-badge">ร่าง • นักเรียนยังไม่เห็น</span>' : '') + '</div>' +
       '<div class="exam-card-body">' +
         '<div class="exam-kind"><img class="kind-icon" src="img/3d/memo.png" alt="" />' + (e.source === 'sheets' ? 'Google Sheets' : 'ไฟล์ในเว็บ') +
           (e.examType ? '<span class="kind-dot">•</span><span class="kind-type">' + esc(e.examType) + '</span>' : '') + '</div>' +
@@ -779,7 +780,7 @@
 
 
   var EXAM_HEADERS = ['ชุดข้อสอบ', 'วิชา', 'เวลา(นาที)', 'หัวข้อ', 'ตัวชี้วัด', 'Bloom', 'คำถาม', 'ก', 'ข', 'ค', 'ง', 'คำตอบ', 'คำอธิบาย', 'รูปภาพ',
-    'ความยาก', 'ระดับชั้น', 'กลุ่มสาระ', 'รหัสวิชา', 'สาระ', 'มาตรฐาน', 'หน่วยการเรียนรู้', 'เรื่อง', 'ประเภทการสอบ', 'ความยากของชุด'];
+    'ความยาก', 'ระดับชั้น', 'กลุ่มสาระ', 'รหัสวิชา', 'สาระ', 'มาตรฐาน', 'หน่วยการเรียนรู้', 'เรื่อง', 'ประเภทการสอบ', 'ความยากของชุด', 'สถานะ'];
 
   function sheetPanel() {
     if (!SHEETS_URL) {
@@ -855,7 +856,16 @@
     var html = head(esc(exam.title), exam.questions.length + ' ข้อ • เฉลยและคำอธิบาย',
       '<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap">' +
       '<button type="button" class="btn btn-sm" data-action="close-bank">‹ กลับ</button>' +
-      '<button type="button" class="btn btn-sm btn-primary" data-action="print">พิมพ์เฉลย</button></div>');
+      (exam.source === 'sheets' && SHEETS_URL
+        ? (exam.status === 'draft'
+          ? '<button type="button" class="btn btn-sm btn-primary" data-action="set-status" data-status="เผยแพร่">เผยแพร่ให้นักเรียน</button>'
+          : '<button type="button" class="btn btn-sm" data-action="set-status" data-status="ร่าง">ซ่อนเป็นร่าง</button>')
+        : '') +
+      '<button type="button" class="btn btn-sm' + (exam.status === 'draft' ? '' : ' btn-primary') + '" data-action="print">พิมพ์เฉลย</button></div>');
+    if (exam.status === 'draft') {
+      html += '<div class="status-note no-print"><img src="img/3d/memo.png" alt="" /><div><b>ชุดนี้ยังเป็นร่าง นักเรียนยังไม่เห็น</b>' +
+        '<span>ตรวจคำถาม เฉลย และคำอธิบายให้เรียบร้อย แก้ข้อที่ผิดได้ด้วยปุ่ม "แก้ไขข้อนี้" แล้วกด "เผยแพร่ให้นักเรียน"</span></div></div>';
+    }
     html += '<div class="paper-head card"><div class="tags">' + typePill(exam.examType) + diffPill(exam.difficulty, 'ความยาก ') +
       '<span class="pill">' + exam.questions.length + ' ข้อ</span><span class="pill">' + (exam.timeLimitMinutes || 15) + ' นาที</span></div>' +
       '<div class="meta wide">' + metaTable(exam, true).replace(/^<dl class="meta">|<\/dl>$/g, '') + '</div></div>';
@@ -1070,7 +1080,15 @@
     if (!q || ed.busy) return;
     var tooOld = needsVersion(SCRIPT_VERSION);
     if (tooOld) return editError(tooOld);
-    if (!window.confirm('ลบข้อนี้ออกจากชุด "' + exam.title + '" ใช่ไหม?\n\n' + q.question + '\n\nลบแล้วจะหายจากสเปรดชีตด้วย')) return;
+    askConfirm({
+      title: 'ลบข้อนี้ออกจากชุด "' + exam.title + '" ไหม?',
+      text: q.question,
+      note: 'ลบแล้วจะหายจากสเปรดชีตด้วย',
+      ok: 'ลบข้อนี้', danger: true
+    }, function () { doDeleteEdit(ed, q); });
+  }
+
+  function doDeleteEdit(ed, q) {
     ed.busy = 'delete';
     ed.msg = null;
     renderKeepEdit();
@@ -1522,7 +1540,7 @@
         if (data.sheetStatus === 'fresh' && found === expected.length) {
           state.draft = null;
           state.pasteText = '';
-          state.importMsg = { kind: 'ok', text: 'เพิ่มเข้าเว็บแล้ว ' + found + ' ข้อ นักเรียนจะเห็นชุดข้อสอบนี้เมื่อเปิดเว็บครั้งถัดไป' };
+          state.importMsg = { kind: 'ok', text: 'เพิ่มแล้ว ' + found + ' ข้อ ชุดใหม่จะเป็น "ร่าง" ก่อน นักเรียนยังไม่เห็น ไปที่คลังข้อสอบเพื่อตรวจ แล้วกด "เผยแพร่ให้นักเรียน"' };
         } else if (found > 0) {
           state.importMsg = { kind: 'bad', text: 'เพิ่มได้ ' + found + ' จาก ' + expected.length + ' ข้อ ลองกดเพิ่มอีกครั้ง ข้อที่มีแล้วจะถูกข้ามให้เอง' };
           state.draft = buildDraft(d.text, d.filename);
@@ -1606,6 +1624,78 @@
     $('nav').innerHTML = NAV.map(function (n) {
       return '<button type="button" class="nav-btn' + (state.view === n.id ? ' active' : '') + '" data-action="nav" data-view="' + n.id + '">' + ICONS[n.id] + '<span>' + n.label + '</span></button>';
     }).join('');
+  }
+
+  // ---------- กล่องยืนยันในธีม ----------
+
+  var confirmAction = null;
+
+  function askConfirm(opts, onOk) {
+    $('tConfirmTitle').textContent = opts.title || '';
+    $('tConfirmText').textContent = opts.text || '';
+    $('tConfirmText').hidden = !opts.text;
+    $('tConfirmNote').textContent = opts.note || '';
+    $('tConfirmNote').hidden = !opts.note;
+    var ok = $('tConfirmOk');
+    ok.textContent = opts.ok || 'ตกลง';
+    ok.className = 'btn ' + (opts.danger ? 'btn-danger' : 'btn-primary');
+    confirmAction = onOk;
+    $('tConfirm').hidden = false;
+    ok.focus();
+  }
+
+  function closeConfirm(run) {
+    var action = confirmAction;
+    confirmAction = null;
+    $('tConfirm').hidden = true;
+    if (run && action) action();
+  }
+
+  // ---------- เผยแพร่ / ร่าง ----------
+
+  function setExamStatus(exam, status) {
+    var publish = status === 'เผยแพร่';
+    askConfirm({
+      title: publish ? 'เผยแพร่ "' + exam.title + '" ให้นักเรียนไหม?' : 'ซ่อน "' + exam.title + '" เป็นร่างไหม?',
+      note: publish ? 'นักเรียนจะเห็นชุดนี้เมื่อเปิดเว็บครั้งถัดไป (' + exam.questions.length + ' ข้อ)' : 'นักเรียนจะไม่เห็นชุดนี้จนกว่าครูจะเผยแพร่อีกครั้ง คะแนนเดิมยังอยู่',
+      ok: publish ? 'เผยแพร่' : 'ซ่อนเป็นร่าง'
+    }, function () {
+      var tooOld = needsVersion(SCRIPT_VERSION);
+      if (tooOld) { state.statusMsg = { kind: 'bad', text: tooOld }; render(); return; }
+      state.statusBusy = true;
+      render();
+      postScript({ action: 'setExamStatus', title: exam.title, status: status }).then(function (reply) {
+        var problem = replyProblem(reply);
+        if (problem) throw new Error(problem);
+        var calls = 0;
+        ExamSource.load(function (data) {
+          calls++;
+          if (calls === 1) return;
+          state.exams = data.exams;
+          state.sheet = data;
+          state.stats = null;
+          analyze();
+          state.statusBusy = false;
+          state.statusMsg = { kind: 'ok', text: publish ? 'เผยแพร่แล้ว นักเรียนจะเห็นชุดนี้เมื่อเปิดเว็บครั้งถัดไป' : 'ซ่อนเป็นร่างแล้ว นักเรียนจะไม่เห็นชุดนี้' };
+          render();
+        });
+      }).catch(function (err) {
+        state.statusBusy = false;
+        state.statusMsg = { kind: 'bad', text: err && err.message && err.message.indexOf('fetch') < 0 ? err.message : 'ส่งข้อมูลไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง' };
+        render();
+      });
+    });
+  }
+
+  // ---------- แถบเตือนอัปเดตสคริปต์ ----------
+
+  function scriptBanner() {
+    var v = state.sheet && state.sheet.sheetStatus === 'fresh' ? state.sheet.scriptVersion : null;
+    if (!SHEETS_URL || !v || v >= SCRIPT_VERSION) return '';
+    return '<div class="update-banner no-print"><img src="img/3d/light_bulb.png" alt="" />' +
+      '<div><b>อัปเดตสคริปต์ Google เป็นเวอร์ชัน ' + SCRIPT_VERSION + ' (ตอนนี้เวอร์ชัน ' + v + ')</b>' +
+      '<span>ต้องอัปเดตก่อนจึงจะใช้ บัญชีนักเรียน การแก้ข้อสอบทีละข้อ อัปโหลดรูป และการเผยแพร่ข้อสอบได้ ใช้เวลาประมาณ 2 นาที</span></div>' +
+      '<button type="button" class="btn btn-sm btn-primary" data-action="show-update">ดูวิธีอัปเดต</button></div>';
   }
 
   function renderDemoBanner() {
@@ -1752,12 +1842,25 @@
 
   function resetAccountPassword(username) {
     var pass = randomPassword();
-    if (!window.confirm('ตั้งรหัสผ่านใหม่ให้ ' + username + ' เป็น ' + pass + ' ใช่ไหม?\n\nเครื่องที่นักเรียนเคยเข้าไว้จะต้องเข้าสู่ระบบใหม่ด้วยรหัสนี้')) return;
-    saveAccounts([{ username: username, password: pass }], function () { return 'ตั้งรหัสใหม่ให้ ' + username + ' แล้ว: ' + pass; });
+    askConfirm({
+      title: 'ตั้งรหัสผ่านใหม่ให้ ' + username + ' ไหม?',
+      text: 'รหัสใหม่: ' + pass,
+      note: 'เครื่องที่นักเรียนเคยเข้าไว้จะต้องเข้าสู่ระบบใหม่ด้วยรหัสนี้ คะแนนเดิมยังอยู่ครบ',
+      ok: 'ตั้งรหัสใหม่'
+    }, function () {
+      saveAccounts([{ username: username, password: pass }], function () { return 'ตั้งรหัสใหม่ให้ ' + username + ' แล้ว: ' + pass; });
+    });
   }
 
   function deleteAccount(username) {
-    if (!window.confirm('ลบบัญชี ' + username + ' ใช่ไหม?\n\nนักเรียนคนนี้จะเข้าสู่ระบบไม่ได้อีก (คะแนนที่ส่งมาแล้วในแท็บ results ยังอยู่)')) return;
+    askConfirm({
+      title: 'ลบบัญชี ' + username + ' ไหม?',
+      note: 'นักเรียนคนนี้จะเข้าสู่ระบบไม่ได้อีก คะแนนที่ส่งมาแล้วในแท็บ results ยังอยู่',
+      ok: 'ลบบัญชี', danger: true
+    }, function () { doDeleteAccount(username); });
+  }
+
+  function doDeleteAccount(username) {
     var a = state.accounts;
     a.busy = true;
     render();
@@ -1801,7 +1904,9 @@
     renderDemoBanner();
     var views = { overview: renderOverview, students: renderStudents, analysis: renderAnalysis, bank: renderBank, import: renderImport, accounts: renderAccounts, settings: renderSettings };
     var view = $('view');
-    view.innerHTML = '<div class="view">' + views[state.view]() + '</div>';
+    var statusMsg = state.statusMsg && state.view === 'bank'
+      ? '<div class="panel card block import-msg ' + state.statusMsg.kind + ' no-print"><p class="msg ' + state.statusMsg.kind + '" style="margin:0">' + esc(state.statusMsg.text) + '</p></div>' : '';
+    view.innerHTML = '<div class="view">' + scriptBanner() + statusMsg + views[state.view]() + '</div>';
     $('aside').innerHTML = renderAside();
     if ($('scriptBox')) loadScript();
     bindDropZone();
@@ -1834,6 +1939,7 @@
 
   function go(view) {
     state.view = view;
+    state.statusMsg = null;
     if (view === 'accounts' && !state.accounts.list && !state.accounts.loading) loadAccounts();
     state.studentKey = null;
     state.bankExamId = null;
@@ -1885,7 +1991,7 @@
     else if (a === 'open-student') { state.studentKey = t.dataset.key; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
     else if (a === 'close-student') { state.studentKey = null; render(); }
     else if (a === 'pick-analysis') { state.analysisExamId = t.dataset.exam; render(); }
-    else if (a === 'open-bank') { state.bankExamId = t.dataset.exam; state.edit = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    else if (a === 'open-bank') { state.statusMsg = null; state.bankExamId = t.dataset.exam; state.edit = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
     else if (a === 'bank-nav') {
       state.bankNav = { subject: t.dataset.s || '', unit: t.dataset.u || '', lesson: t.dataset.l || '' };
       render();
@@ -1925,6 +2031,15 @@
     else if (a === 'acc-reset') resetAccountPassword(t.dataset.user);
     else if (a === 'acc-delete') deleteAccount(t.dataset.user);
     else if (a === 'acc-print') printAccountCards();
+    else if (a === 'set-status') { if (!state.statusBusy) setExamStatus(examById(state.bankExamId), t.dataset.status); }
+    else if (a === 'confirm-ok') closeConfirm(true);
+    else if (a === 'confirm-cancel') closeConfirm(false);
+    else if (a === 'show-update') {
+      state.view = 'bank'; state.bankExamId = null; state.bankNav = { subject: '', unit: '', lesson: '' };
+      render();
+      var g = document.querySelector('.guide');
+      if (g) { g.open = true; g.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    }
     else if (a === 'forget-key') { lsSet(KEY_STORE, null); state.connected = false; showLock(); }
   }
 
@@ -2014,6 +2129,10 @@
     document.addEventListener('click', onClick);
     document.addEventListener('input', onInput);
     document.addEventListener('submit', onSubmit);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !$('tConfirm').hidden) closeConfirm(false);
+    });
+    $('tConfirm').addEventListener('click', function (e) { if (e.target.id === 'tConfirm') closeConfirm(false); });
     document.addEventListener('change', function (e) {
       if (e.target.id === 'importFile') readImportFile(e.target.files[0]);
       if (e.target.id === 'edImageFile') uploadEditImage(e.target.files[0]);
