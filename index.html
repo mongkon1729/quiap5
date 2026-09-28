@@ -11,54 +11,94 @@
 <link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/style.css" />
 </head>
-<body>
-<div class="student-app">
+<body class="student">
+<div class="app-shell">
 
-  <header class="topbar">
-    <a class="brand" href="./">ห้องติว<span>.</span></a>
-    <div class="topbar-right">
-      <div id="userChip" class="user-chip" hidden>
-        <span class="avatar" aria-hidden="true">★</span>
-        <span id="userChipName" class="name"></span>
-      </div>
-      <button id="btnTheme" type="button" class="icon-btn" aria-label="สลับโหมดสว่าง/มืด"></button>
+  <aside class="app-side" aria-label="เมนูหลัก">
+    <a class="brand" href="./#/"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>ห้องติว</a>
+    <nav id="sideNav" class="side-nav"></nav>
+    <div class="side-promo">
+      <div class="side-promo-art" aria-hidden="true">📝</div>
+      <p id="sidePromoText">ข้อที่เคยตอบผิด<br />ทำอีกรอบให้ถูกนะ</p>
+      <button id="btnSideReview" type="button" class="btn btn-primary btn-sm">ทบทวนข้อที่ผิด →</button>
     </div>
-  </header>
+  </aside>
 
-  <div id="storageWarning" class="banner" hidden>
-    เบราว์เซอร์นี้บันทึกข้อมูลไม่ได้ (อาจเป็นโหมดส่วนตัว) ทำข้อสอบได้ตามปกติ แต่คะแนนจะไม่ถูกบันทึกไว้ในเครื่องนะ
-  </div>
+  <div class="app-main">
+    <header class="topbar">
+      <a class="brand brand-mobile" href="./#/"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>ห้องติว</a>
+      <label class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="searchInput" type="search" placeholder="ค้นหาชุดข้อสอบ..." aria-label="ค้นหาชุดข้อสอบ" autocomplete="off" />
+      </label>
+      <div class="topbar-right">
+        <button id="btnTheme" type="button" class="icon-btn" aria-label="สลับโหมดสว่าง/มืด"></button>
+        <div id="userChip" class="user-chip" hidden>
+          <span class="avatar" aria-hidden="true">★</span>
+          <span id="userChipName" class="name"></span>
+        </div>
+      </div>
+    </header>
 
-  <main>
+    <div id="storageWarning" class="banner" hidden>
+      เบราว์เซอร์นี้บันทึกข้อมูลไม่ได้ (อาจเป็นโหมดส่วนตัว) ทำข้อสอบได้ตามปกติ แต่คะแนนจะไม่ถูกบันทึกไว้ในเครื่องนะ
+    </div>
+
+    <main>
     <!-- หน้าเริ่มต้น -->
     <section id="screen-start" class="screen">
-      <div class="hero card">
+      <div class="hero hero-banner">
+        <div id="heroArt" class="hero-illus hero-illus-left"></div>
         <div class="hero-text">
           <h1 id="heroTitle">วันนี้ฝึกทำข้อสอบกันไหม</h1>
           <p id="heroSub">เลือกวิชาด้านล่างได้เลย ทำทีละข้อ มีเฉลยให้ทุกข้อ</p>
+          <a class="btn btn-hero" href="#subjects" id="heroCta">เริ่มฝึกเลย</a>
         </div>
-        <div id="heroArt" class="hero-art"></div>
+        <div id="heroShelf" class="hero-illus hero-illus-right"></div>
       </div>
 
-      <ol id="howTo" class="how-to">
-        <li><span>1</span>เลือกวิชาและเรื่องที่อยากฝึก</li>
-        <li><span>2</span>ใส่เลขที่ ชื่อเล่น และ PIN</li>
-        <li><span>3</span>ตอบทีละข้อ ดูเฉลยได้เลย</li>
-      </ol>
+      <div class="start-grid">
+        <div class="start-main">
+          <div class="panel-card">
+            <nav id="browseCrumbs" class="crumbs" aria-label="ตำแหน่งที่อยู่" hidden></nav>
+            <div class="section-head" id="subjects">
+              <h2 id="browseTitle">เลือกวิชา</h2>
+              <span id="examCount" class="muted"></span>
+            </div>
+            <div id="examList" class="exam-grid" aria-live="polite"></div>
 
-      <nav id="browseCrumbs" class="crumbs" aria-label="ตำแหน่งที่อยู่" hidden></nav>
-      <div class="section-head">
-        <h2 id="browseTitle">เลือกวิชา</h2>
-        <span id="examCount" class="muted"></span>
-      </div>
-      <div id="examList" class="exam-grid" aria-live="polite"></div>
-
-      <div id="reviewEntry" class="review-card card" hidden>
-        <div class="review-text">
-          <strong>ข้อที่เคยตอบผิด <span id="reviewCount">0</span> ข้อ</strong>
-          <span>ลองทำอีกครั้ง ทำถูกแล้วจะหายจากรายการ</span>
+            <div id="recentBlock" hidden>
+              <div class="section-head section-head-gap">
+                <h2>ทำล่าสุด</h2>
+                <span class="muted">ทำอีกครั้งเพื่อเพิ่มคะแนน</span>
+              </div>
+              <div id="recentList" class="exam-grid"></div>
+            </div>
+          </div>
         </div>
-        <button id="btnGlobalReview" type="button" class="btn btn-sm">ทบทวนเลย</button>
+
+        <aside class="start-side">
+          <div class="side-card">
+            <div class="side-card-head">
+              <div><h3>ความก้าวหน้าของฉัน</h3><p id="achieveSub">ทำครบทุกชุดในวิชาเพื่อเก็บดาว</p></div>
+              <span class="side-card-icon" aria-hidden="true">🏆</span>
+            </div>
+            <div id="achieveList" class="achieve-list"></div>
+          </div>
+
+          <div id="reviewEntry" class="side-card review-card" hidden>
+            <div class="review-text">
+              <strong>ข้อที่เคยตอบผิด <span id="reviewCount">0</span> ข้อ</strong>
+              <span>ลองทำอีกครั้ง ทำถูกแล้วจะหายจากรายการ</span>
+            </div>
+            <button id="btnGlobalReview" type="button" class="btn btn-primary btn-sm">ทบทวนเลย</button>
+          </div>
+
+          <div class="side-card">
+            <div class="side-card-head"><div><h3>ชุดแนะนำ</h3><p>ยังไม่เคยทำ ลองดูสักชุด</p></div></div>
+            <div id="suggestList" class="suggest-list"></div>
+          </div>
+        </aside>
       </div>
 
       <footer class="site-foot">
@@ -171,7 +211,8 @@
         </div>
       </div>
     </section>
-  </main>
+    </main>
+  </div>
 
   <div id="imageModal" class="image-modal" hidden>
     <img id="imageModalImg" src="" alt="" />

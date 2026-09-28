@@ -49,7 +49,16 @@
     el.examCount = document.getElementById('examCount');
     el.browseTitle = document.getElementById('browseTitle');
     el.browseCrumbs = document.getElementById('browseCrumbs');
-    el.howTo = document.getElementById('howTo');
+    el.searchInput = document.getElementById('searchInput');
+    el.sideNav = document.getElementById('sideNav');
+    el.btnSideReview = document.getElementById('btnSideReview');
+    el.sidePromoText = document.getElementById('sidePromoText');
+    el.recentBlock = document.getElementById('recentBlock');
+    el.recentList = document.getElementById('recentList');
+    el.achieveList = document.getElementById('achieveList');
+    el.achieveSub = document.getElementById('achieveSub');
+    el.suggestList = document.getElementById('suggestList');
+    el.heroShelf = document.getElementById('heroShelf');
     el.heroCard = el.heroTitle.closest('.hero');
     el.examList = document.getElementById('examList');
     el.reviewEntry = document.getElementById('reviewEntry');
@@ -116,6 +125,7 @@
     [el.screenStart, el.screenIdentify, el.screenQuiz, el.screenSummary, el.screenReviewDone].forEach(function (s) {
       s.hidden = s !== screenEl;
     });
+    document.body.classList.toggle('in-quiz', screenEl !== el.screenStart);
     window.scrollTo(0, 0);
   }
 
@@ -138,7 +148,6 @@
 
   function renderUserChip() {
     el.userChip.hidden = !state.currentUserName;
-    document.getElementById('howTo').hidden = !!state.currentUserName;
     el.userChipName.textContent = state.currentUserName || '';
     if (state.currentUserName) {
       el.heroTitle.textContent = 'สวัสดี ' + state.currentUserName;
@@ -208,6 +217,21 @@
   function renderBrowse() {
     var nav = readNav();
     var all = examsData.exams;
+    var query = (el.searchInput.value || '').trim().toLowerCase();
+    if (query) {
+      var found = all.filter(function (e) {
+        return [e.title, e.subject, e.unit, e.lesson, e.strand].join(' ').toLowerCase().indexOf(query) >= 0;
+      });
+      el.heroCard.hidden = true;
+      renderCrumbs([]);
+      el.browseTitle.textContent = 'ผลการค้นหา';
+      el.examCount.textContent = found.length + ' ชุด';
+      el.examList.className = 'nav-list';
+      el.examList.innerHTML = '';
+      if (found.length) appendExamCards(found, '');
+      else el.examList.innerHTML = '<p class="empty-note">ไม่พบชุดข้อสอบที่ตรงกับ "' + escapeHtml(el.searchInput.value.trim()) + '" ลองพิมพ์คำอื่นดูนะ</p>';
+      return;
+    }
     var bySubject = groupBy(all, function (e) { return subjectOf(e).name; });
     var subject = bySubject.find(function (g) { return g.key === nav.subject; });
     var theme = subject ? subjectOf(subject.items[0]) : null;
@@ -217,7 +241,6 @@
     var lesson = lessons.find(function (g) { return g.key === nav.lesson; });
 
     el.examList.innerHTML = '';
-    el.howTo.hidden = !!subject;
     el.heroCard.hidden = !!subject;
 
     if (!subject) {
@@ -295,24 +318,26 @@
   function examCard(exam, i) {
     var best = state.currentUserName ? Storage.getBestScore(state.currentUserName, exam.id) : null;
     var pct = best ? Math.round((best.score / best.total) * 100) : 0;
+    var theme = subjectOf(exam);
+    var chips = [exam.lesson || (exam.unit ? exam.unit : ''), exam.difficulty, exam.grade].filter(Boolean);
     var card = document.createElement('article');
-    card.className = 'exam-card card';
-    card.style.animationDelay = (i * 70) + 'ms';
+    card.className = 'exam-card';
+    card.style.animationDelay = ((i % 8) * 60) + 'ms';
     card.innerHTML =
-      '<div class="cover">' + Art.cover(i) +
-        '<span class="pill">' + exam.questions.length + ' ข้อ</span>' +
+      '<div class="cover">' + Art.cover(i, theme.icon) +
+        '<span class="cover-badge">' + exam.questions.length + ' ข้อ</span>' +
       '</div>' +
       '<div class="exam-card-body">' +
-        examTags(exam) +
+        '<div class="exam-kind"><span class="kind-icon" aria-hidden="true">📝</span>แบบทดสอบ' +
+          (exam.examType ? '<span class="kind-dot">•</span><span class="kind-type">' + escapeHtml(exam.examType) + '</span>' : '') + '</div>' +
         '<h3>' + escapeHtml(exam.title) + '</h3>' +
-        (exam.lesson || exam.unit ? '<p class="exam-lesson">' + escapeHtml(exam.lesson ? 'เรื่อง ' + exam.lesson : exam.unit) + '</p>' : '') +
-        '<div class="exam-meta"><span>' + escapeHtml([exam.subject, exam.grade].filter(Boolean).join(' • ')) + '</span>' +
-        '<span>จับเวลา ' + (exam.timeLimitMinutes || 15) + ' นาที</span></div>' +
-        (best
-          ? '<div class="best-row"><span>คะแนนสูงสุด</span><strong>' + best.score + '/' + best.total + '</strong></div>' +
-            '<div class="bar"><span style="width:' + pct + '%"></span></div>'
-          : '<div class="best-row"><span>' + (state.currentUserName ? 'ยังไม่เคยทำชุดนี้' : 'เข้าชื่อแล้วจะเห็นคะแนนสูงสุด') + '</span></div>') +
-        '<button type="button" class="btn btn-primary btn-start-exam">เริ่มทำข้อสอบ</button>' +
+        (chips.length ? '<div class="exam-chips">' + chips.map(function (c) { return '<span>' + escapeHtml(c) + '</span>'; }).join('') + '</div>' : '') +
+        '<div class="exam-foot">' +
+          (best
+            ? '<span class="exam-progress"><span class="ring" style="--p:' + pct + '"></span><span>คะแนนสูงสุด <b>' + best.score + '/' + best.total + '</b></span></span>'
+            : '<span class="exam-progress muted">' + (state.currentUserName ? 'ยังไม่เริ่ม' : '⏱ ' + (exam.timeLimitMinutes || 15) + ' นาที') + '</span>') +
+          '<button type="button" class="btn btn-outline btn-sm btn-start-exam">' + (best ? 'ทำอีกครั้ง' : 'เริ่ม') + '</button>' +
+        '</div>' +
       '</div>';
     card.querySelector('.btn-start-exam').addEventListener('click', function () {
       openIdentifyScreen(exam);
@@ -320,9 +345,80 @@
     return card;
   }
 
+  // ---------- เมนูข้าง ทำล่าสุด ความก้าวหน้า ชุดแนะนำ ----------
+
+  var HOME_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>';
+  var REVIEW_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>';
+  var TEACHER_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
+
+  function renderSideNav() {
+    var nav = readNav();
+    var subjects = groupBy(examsData.exams, function (e) { return subjectOf(e).name; });
+    var item = function (href, icon, label, active) {
+      return '<a class="side-link' + (active ? ' active' : '') + '" href="' + href + '"' + (active ? ' aria-current="page"' : '') + '>' +
+        '<span class="side-link-icon">' + icon + '</span><span>' + escapeHtml(label) + '</span></a>';
+    };
+    el.sideNav.innerHTML = item('#/', HOME_ICON, 'หน้าแรก', !nav.subject) +
+      subjects.map(function (g) {
+        return item(navHash(g.key), '<span class="side-emoji">' + subjectOf(g.items[0]).icon + '</span>', g.key, nav.subject === g.key);
+      }).join('') +
+      '<button type="button" class="side-link" id="sideReviewLink"><span class="side-link-icon">' + REVIEW_ICON + '</span><span>ทบทวนข้อที่ผิด</span></button>' +
+      item('teacher.html', TEACHER_ICON, 'สำหรับคุณครู', false);
+    document.getElementById('sideReviewLink').addEventListener('click', startReviewOrHint);
+  }
+
+  function startReviewOrHint() {
+    var n = state.currentUserName ? Storage.getWrongQuestions(state.currentUserName).length : 0;
+    if (n > 0) { startReview(); return; }
+    el.sidePromoText.innerHTML = state.currentUserName
+      ? 'ตอนนี้ยังไม่มีข้อที่ตอบผิด<br />เก่งมากเลย'
+      : 'เริ่มทำข้อสอบสักชุดก่อน<br />แล้วข้อที่ผิดจะมารวมตรงนี้';
+  }
+
+  function renderSideColumn() {
+    var all = examsData.exams;
+    var user = state.currentUserName;
+
+    // ทำล่าสุด (เหมือนแถว Ongoing)
+    var done = user ? all.filter(function (e) { return Storage.getBestScore(user, e.id); }) : [];
+    var showRecent = done.length && !readNav().subject && !(el.searchInput.value || '').trim();
+    el.recentBlock.hidden = !showRecent;
+    el.recentList.innerHTML = '';
+    if (showRecent) done.slice(0, 4).forEach(function (e) { el.recentList.appendChild(examCard(e, all.indexOf(e))); });
+
+    // ความก้าวหน้าต่อวิชา
+    var subjects = groupBy(all, function (e) { return subjectOf(e).name; });
+    el.achieveSub.textContent = user ? 'ทำครบทุกชุดในวิชาเพื่อเก็บดาว' : 'ใส่ชื่อตอนเริ่มทำข้อสอบ แล้วจะเห็นความคืบหน้าตรงนี้';
+    el.achieveList.innerHTML = subjects.map(function (g) {
+      var t = subjectOf(g.items[0]);
+      var n = user ? g.items.filter(function (e) { return Storage.getBestScore(user, e.id); }).length : 0;
+      var pct = Math.round(n / g.items.length * 100);
+      return '<a class="achieve-row" href="' + navHash(g.key) + '"><span class="achieve-icon" style="background:' + t.c1 + '">' + t.icon + '</span>' +
+        '<span class="achieve-body"><span class="achieve-top"><b>' + escapeHtml(g.key) + '</b><span>' + (pct === 100 ? '⭐ ' : '') + n + '/' + g.items.length + ' ชุด</span></span>' +
+        '<span class="bar"><span style="width:' + pct + '%"></span></span></span></a>';
+    }).join('');
+
+    // ชุดแนะนำ (เหมือน Best sales)
+    var fresh = all.filter(function (e) { return !user || !Storage.getBestScore(user, e.id); });
+    var picks = (fresh.length ? fresh : all).slice(0, 5);
+    el.suggestList.innerHTML = '';
+    picks.forEach(function (e) {
+      var t = subjectOf(e);
+      var row = document.createElement('div');
+      row.className = 'suggest-row';
+      row.innerHTML = '<span class="suggest-thumb" style="background:' + t.c1 + '">' + t.icon + '</span>' +
+        '<span class="suggest-body"><b>' + escapeHtml(e.title) + '</b><span>⭐ ' + e.questions.length + ' ข้อ • ' + escapeHtml(t.name) + '</span></span>' +
+        '<button type="button" class="btn btn-primary suggest-btn">ทำ</button>';
+      row.querySelector('button').addEventListener('click', function () { openIdentifyScreen(e); });
+      el.suggestList.appendChild(row);
+    });
+  }
+
   function renderStartScreen() {
     renderUserChip();
     renderBrowse();
+    renderSideNav();
+    renderSideColumn();
 
     var wrongCount = state.currentUserName ? Storage.getWrongQuestions(state.currentUserName).length : 0;
     if (wrongCount > 0) {
@@ -770,6 +866,11 @@
     el.imageModal.addEventListener('click', closeImageModal);
 
     el.btnGlobalReview.addEventListener('click', startReview);
+    el.btnSideReview.addEventListener('click', startReviewOrHint);
+    el.searchInput.addEventListener('input', function () {
+      if (el.screenStart.hidden) goToStart();
+      renderStartScreen();
+    });
     el.btnReviewWrong.addEventListener('click', startReview);
     el.btnRetake.addEventListener('click', function () {
       startQuiz(state.selectedExam);
@@ -832,10 +933,12 @@
       el.storageWarning.hidden = false;
     }
     el.heroArt.innerHTML = Art.hero();
+    el.heroShelf.innerHTML = Art.shelf();
     renderThemeButton();
     ResultSync.flush();
 
     window.addEventListener('hashchange', function () {
+      el.searchInput.value = '';
       if (el.screenStart.hidden) return;
       renderStartScreen();
       window.scrollTo(0, 0);

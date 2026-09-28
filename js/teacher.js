@@ -401,7 +401,7 @@
   function renderOverview() {
     var s = state.stats;
     var sub = state.loadedAt ? 'อัปเดต ' + whenText(state.loadedAt) : '';
-    var html = head('ภาพรวมห้องเรียน', sub, refreshBtn());
+    var html = head('ภาพรวมห้องเรียน', sub, refreshBtn()) + teacherBanner();
 
     if (!state.rows.length) return html + noDataPanel();
 
@@ -444,6 +444,13 @@
         : '<div class="panel card"><p class="empty-note">ไม่มีนักเรียนที่คะแนนเฉลี่ยต่ำกว่า 50% เยี่ยมมาก</p></div>') +
       '</div>';
     return html;
+  }
+
+  function teacherBanner() {
+    return '<div class="hero hero-banner"><div class="hero-illus hero-illus-left">' + Art.hero() + '</div>' +
+      '<div class="hero-text"><h1>สวัสดีคุณครู</h1><p>ดูผลของนักเรียน วิเคราะห์ข้อสอบ และเพิ่มชุดใหม่ได้จากที่นี่</p>' +
+      '<button type="button" class="btn btn-hero" data-action="nav" data-view="import">เพิ่มข้อสอบชุดใหม่</button></div>' +
+      '<div class="hero-illus hero-illus-right">' + Art.shelf() + '</div></div>';
   }
 
   function stat(color, label, value, foot) {
@@ -751,21 +758,22 @@
 
   function bankCard(e) {
     var i = state.exams.indexOf(e);
-    var bloom = {};
-    e.questions.forEach(function (q) { if (q.bloom) bloom[q.bloom] = (bloom[q.bloom] || 0) + 1; });
-    return '<article class="bank-card card" style="animation-delay:' + ((i % 6) * 60) + 'ms"><div class="cover">' + Art.cover(i) + '</div><div class="body">' +
-      '<div class="tags">' + typePill(e.examType) + diffPill(e.difficulty, 'ความยาก ') +
-        (e.grade ? '<span class="pill">' + esc(e.grade) + '</span>' : '') + '</div>' +
-      '<h3>' + esc(e.title) + '</h3>' +
-      '<div class="exam-meta"><span>' + e.questions.length + ' ข้อ</span><span>จับเวลา ' + (e.timeLimitMinutes || 15) + ' นาที</span>' +
-      '<span>' + (e.source === 'sheets' ? 'จาก Google Sheets' : 'จากไฟล์ในเว็บ') + '</span></div>' +
-      metaTable({ subject: e.subject, courseCode: e.courseCode, standard: e.standard, unit: e.unit, lesson: e.lesson, indicators: e.indicators }, false) +
-      '<div class="chips" style="margin:0;gap:6px">' + Object.keys(bloom).map(function (b) {
-        return '<span class="pill">' + esc(b) + ' ' + bloom[b] + '</span>';
-      }).join('') + '</div>' +
-      '<button type="button" class="btn btn-primary" data-action="open-bank" data-exam="' + esc(e.id) + '">ดูข้อสอบและเฉลย</button>' +
+    var theme = ExamSource.subjectOf(e);
+    var chips = [e.lesson || e.unit, e.difficulty, e.grade].filter(Boolean);
+    var where = [e.courseCode, e.indicators && e.indicators.length ? 'ตัวชี้วัด ' + e.indicators.join(', ') : ''].filter(Boolean).join(' • ');
+    return '<article class="exam-card" style="animation-delay:' + ((i % 6) * 60) + 'ms">' +
+      '<div class="cover">' + Art.cover(i, theme.icon) + '<span class="cover-badge">' + e.questions.length + ' ข้อ</span></div>' +
+      '<div class="exam-card-body">' +
+        '<div class="exam-kind"><span class="kind-icon" aria-hidden="true">📝</span>' + (e.source === 'sheets' ? 'Google Sheets' : 'ไฟล์ในเว็บ') +
+          (e.examType ? '<span class="kind-dot">•</span><span class="kind-type">' + esc(e.examType) + '</span>' : '') + '</div>' +
+        '<h3>' + esc(e.title) + '</h3>' +
+        (chips.length ? '<div class="exam-chips">' + chips.map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') + '</div>' : '') +
+        (where ? '<p class="meta-mini">' + esc(where) + '</p>' : '') +
+        '<div class="exam-foot"><span class="exam-progress">⏱ ' + (e.timeLimitMinutes || 15) + ' นาที</span>' +
+        '<button type="button" class="btn btn-outline btn-sm" data-action="open-bank" data-exam="' + esc(e.id) + '">ดูข้อสอบ</button></div>' +
       '</div></article>';
   }
+
 
   var EXAM_HEADERS = ['ชุดข้อสอบ', 'วิชา', 'เวลา(นาที)', 'หัวข้อ', 'ตัวชี้วัด', 'Bloom', 'คำถาม', 'ก', 'ข', 'ค', 'ง', 'คำตอบ', 'คำอธิบาย', 'รูปภาพ',
     'ความยาก', 'ระดับชั้น', 'กลุ่มสาระ', 'รหัสวิชา', 'สาระ', 'มาตรฐาน', 'หน่วยการเรียนรู้', 'เรื่อง', 'ประเภทการสอบ', 'ความยากของชุด'];
