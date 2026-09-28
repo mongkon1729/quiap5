@@ -30,6 +30,46 @@
     { id: 'settings', label: 'ตั้งค่า' }
   ];
 
+  // บทและเรื่องตามสาระการเรียนรู้แกนกลาง ป.5 (data/structure-p5.json)
+  var structure = { subjects: {} };
+
+  function loadStructure() {
+    return fetch('data/structure-p5.json').then(function (r) { return r.json(); }).then(function (data) {
+      structure = data;
+    }).catch(function () { /* optional: the bank still works from the sheet alone */ });
+  }
+
+  function officialUnits(subjectName) {
+    return (structure.subjects && structure.subjects[subjectName]) || [];
+  }
+
+  // Curriculum names first (in curriculum order), then any extra names the teacher made up.
+  function mergeGroups(groups, officialNames) {
+    var byKey = {};
+    groups.forEach(function (g) { byKey[g.key] = g; });
+    var out = officialNames.map(function (name) {
+      var g = byKey[name];
+      delete byKey[name];
+      return { key: name, items: g ? g.items : [], official: true };
+    });
+    groups.forEach(function (g) { if (byKey[g.key]) out.push({ key: g.key, items: g.items, official: false }); });
+    return out;
+  }
+
+  // every subject in the curriculum shows up, even before it has exams
+  function subjectGroups() {
+    var ES = ExamSource;
+    var groups = ES.groupBy(state.exams, function (e) { return ES.subjectOf(e).name; });
+    var names = ES.SUBJECTS.map(function (s) { return s.name; }).filter(function (n) { return officialUnits(n).length; });
+    var merged = mergeGroups(groups, names);
+    // subjects that have exams come first
+    return merged.filter(function (g) { return g.items.length; }).concat(merged.filter(function (g) { return !g.items.length; }));
+  }
+
+  function themeFor(subjectName, items) {
+    return items && items.length ? ExamSource.subjectOf(items[0]) : ExamSource.subjectOf({ subject: subjectName });
+  }
+
   var state = {
     exams: [],
     rows: [],
@@ -403,8 +443,7 @@
 
   function renderOverview() {
     var s = state.stats;
-    var sub = state.loadedAt ? 'อัปเดต ' + whenText(state.loadedAt) : '';
-    var html = head('ภาพรวมห้องเรียน', sub, refreshBtn()) + teacherBanner();
+    var html = teacherBanner();
 
     if (!state.rows.length) return html + subjectCards() + noDataPanel();
 
@@ -418,14 +457,6 @@
     html += subjectCards();
     html += prePostBlock();
 
-    var needHelp = s.students.filter(function (st) { return st.avg != null && st.avg < 50; });
-
-
-    html += '<div class="block"><div class="block-head"><h2>นักเรียนที่ควรช่วยเป็นพิเศษ</h2><span class="muted">คะแนนเฉลี่ยต่ำกว่า 50%</span></div>' +
-      (needHelp.length
-        ? '<div class="student-list">' + needHelp.map(studentCard).join('') + '</div>'
-        : '<div class="panel card"><p class="empty-note">ไม่มีนักเรียนที่คะแนนเฉลี่ยต่ำกว่า 50% เยี่ยมมาก</p></div>') +
-      '</div>';
     return html;
   }
 
@@ -433,7 +464,7 @@
   function subjectCards() {
     var ES = ExamSource;
     var s = state.stats;
-    var groups = ES.groupBy(state.exams, function (e) { return ES.subjectOf(e).name; });
+    var groups = subjectGroups();
     if (!groups.length) return '';
     return '<div class="block"><div class="block-head"><h2>รายวิชา</h2><span class="muted">กดเพื่อดูบทและชุดข้อสอบ</span></div>' +
       '<div class="nav-grid">' + groups.map(function (g, i) {
@@ -443,11 +474,11 @@
           if (es && es.completed) { done += es.completed; sum += es.sumPct; }
         });
         var avg = done ? Math.round(sum / done) : null;
-        var units = ES.groupBy(g.items, ES.unitOf).length;
+        var units = mergeGroups(ES.groupBy(g.items, ES.unitOf), officialUnits(g.key).map(function (u) { return u.unit; })).length;
         return ES.navCardHtml({
           attrs: 'data-action="overview-subject" data-s="' + esc(g.key) + '"',
-          theme: ES.subjectOf(g.items[0]), title: g.key, big: true, delay: i * 60,
-          sub: units + ' บท • ' + g.items.length + ' ชุด' + (avg == null ? '' : ' • เฉลี่ย ' + avg + '%'),
+          theme: themeFor(g.key, g.items), title: g.key, big: true, delay: i * 60,
+          sub: units + ' บท • ' + (g.items.length ? g.items.length + ' ชุด' : 'ยังไม่มีข้อสอบ') + (avg == null ? '' : ' • เฉลี่ย ' + avg + '%'),
           pct: avg
         });
       }).join('') + '</div></div>';
@@ -702,13 +733,18 @@
     }
     var ES = ExamSource;
     var nav = state.bankNav;
-    var bySubject = ES.groupBy(state.exams, function (e) { return ES.subjectOf(e).name; });
+    var bySubject = subjectGroups();
     var subject = bySubject.find(function (g) { return g.key === nav.subject; });
-    var theme = subject ? ES.subjectOf(subject.items[0]) : null;
-    var units = subject ? ES.groupBy(subject.items, ES.unitOf) : [];
+    var theme = subject ? themeFor(subject.key, subject.items) : null;
+    var official = subject ? officialUnits(subject.key) : [];
+    var units = subject ? mergeGroups(ES.groupBy(subject.items, ES.unitOf), official.map(function (u) { return u.unit; })) : [];
     var unit = units.find(function (g) { return g.key === nav.unit; });
-    var lessons = unit ? ES.groupBy(unit.items.filter(ES.lessonOf), ES.lessonOf) : [];
+    var officialUnit = unit ? official.find(function (u) { return u.unit === unit.key; }) : null;
+    var lessons = unit ? mergeGroups(ES.groupBy(unit.items.filter(ES.lessonOf), ES.lessonOf), officialUnit ? officialUnit.lessons : []) : [];
     var lesson = lessons.find(function (g) { return g.key === nav.lesson; });
+    function addButton(u, l) {
+      return '<button type="button" class="btn btn-sm btn-primary" data-action="add-for" data-s="' + esc(subject.key) + '" data-u="' + esc(u || '') + '" data-l="' + esc(l || '') + '">+ เพิ่มข้อสอบ</button>';
+    }
 
     function countText(exams) {
       return exams.length + ' ชุด • ' + exams.reduce(function (n, e) { return n + e.questions.length; }, 0) + ' ข้อ';
@@ -719,10 +755,11 @@
     var reload = SHEETS_URL ? '<button type="button" class="btn btn-sm" data-action="reload-exams">โหลดข้อสอบใหม่</button>' : '';
 
     if (!subject) {
-      var html = head('คลังข้อสอบ', bySubject.length + ' วิชา • ' + countText(state.exams), reload);
+      var html = head('คลังข้อสอบ', bySubject.length + ' วิชา • ' + countText(state.exams), reload) +
+        (structure.source ? '<p class="note" style="margin-top:-8px">บทและเรื่องจัดตาม' + esc(structure.source.split(' จัดกลุ่ม')[0]) + '</p>' : '');
       html += sheetPanel();
       html += '<div class="nav-grid bank-nav">' + bySubject.map(function (g, i) {
-        return ES.navCardHtml({ attrs: navAttrs(g.key), theme: ES.subjectOf(g.items[0]), title: g.key, sub: countText(g.items), big: true, delay: i * 60 });
+        return ES.navCardHtml({ attrs: navAttrs(g.key), theme: themeFor(g.key, g.items), title: g.key, sub: g.items.length ? countText(g.items) : 'ยังไม่มีข้อสอบ', big: true, delay: i * 60 });
       }).join('') + '</div>';
       return html + sheetGuide();
     }
@@ -739,35 +776,41 @@
 
     if (!unit) {
       var canManage = SHEETS_URL && subject.items.some(function (e) { return e.source === 'sheets'; });
+      var addHere = SHEETS_URL ? addButton('', '') : '';
       if (state.manage && state.manage.subject === subject.key) return head(esc(subject.key), 'จัดการบทและเรื่อง', '') + crumbs + manageView();
       return head(esc(subject.key), units.length + ' บท • ' + countText(subject.items),
           '<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap">' +
-          (canManage ? '<button type="button" class="btn btn-sm btn-primary" data-action="manage-open" data-subject="' + esc(subject.key) + '">จัดการบท</button>' : '') + reload + '</div>') + crumbs +
+          (canManage ? '<button type="button" class="btn btn-sm" data-action="manage-open" data-subject="' + esc(subject.key) + '">จัดการบท</button>' : '') + addHere + reload + '</div>') + crumbs +
         '<div class="nav-list">' + units.map(function (g, i) {
-          var n = ES.groupBy(g.items.filter(ES.lessonOf), ES.lessonOf).length;
-          return ES.navCardHtml({
-            attrs: navAttrs(subject.key, g.key), theme: theme, delay: i * 60,
-            kicker: String(g.items[0].unit || '').trim() ? 'บทที่ ' + (i + 1) : '',
-            title: g.key, sub: (n ? n + ' เรื่อง • ' : '') + countText(g.items)
+          var off = official.find(function (u) { return u.unit === g.key; });
+          var n = mergeGroups(ES.groupBy(g.items.filter(ES.lessonOf), ES.lessonOf), off ? off.lessons : []).length;
+          var card = ES.navCardHtml({
+            attrs: navAttrs(subject.key, g.key), theme: theme, delay: i * 40,
+            kicker: 'บทที่ ' + (i + 1) + (off ? ' • ' + off.standards.join(', ') : ' • ครูตั้งเอง'),
+            title: g.key, sub: (n ? n + ' เรื่อง • ' : '') + (g.items.length ? countText(g.items) : 'ยังไม่มีข้อสอบ')
           });
+          return g.items.length ? card : card.replace('class="nav-card', 'class="nav-card is-empty');
         }).join('') + '</div>';
     }
 
     if (!lesson) {
       var loose = unit.items.filter(function (e) { return !ES.lessonOf(e); });
-      return head(esc(unit.key), countText(unit.items), reload) + crumbs +
+      return head(esc(unit.key), unit.items.length ? countText(unit.items) : 'ยังไม่มีข้อสอบ', '<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap">' + addButton(unit.key, '') + reload + '</div>') + crumbs +
         (lessons.length ? '<div class="nav-list">' + lessons.map(function (g, i) {
-          return ES.navCardHtml({
-            attrs: navAttrs(subject.key, unit.key, g.key), theme: theme, delay: i * 60,
-            kicker: 'เรื่องที่ ' + (i + 1), title: g.key, sub: countText(g.items)
+          var card = ES.navCardHtml({
+            attrs: navAttrs(subject.key, unit.key, g.key), theme: theme, delay: i * 40,
+            kicker: 'เรื่องที่ ' + (i + 1), title: g.key, sub: g.items.length ? countText(g.items) : 'ยังไม่มีข้อสอบ'
           });
+          return g.items.length ? card : card.replace('class="nav-card', 'class="nav-card is-empty');
         }).join('') + '</div>' : '') +
         (loose.length ? (lessons.length ? '<h3 class="nav-subhead">ชุดข้อสอบรวมทั้งบท</h3>' : '') +
           '<div class="bank-grid" style="margin-top:14px">' + loose.map(bankCard).join('') + '</div>' : '');
     }
 
-    return head(esc(lesson.key), countText(lesson.items), reload) + crumbs +
-      '<div class="bank-grid">' + lesson.items.map(bankCard).join('') + '</div>';
+    return head(esc(lesson.key), lesson.items.length ? countText(lesson.items) : 'ยังไม่มีข้อสอบ', '<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap">' + addButton(unit.key, lesson.key) + reload + '</div>') + crumbs +
+      (lesson.items.length
+        ? '<div class="bank-grid">' + lesson.items.map(bankCard).join('') + '</div>'
+        : '<div class="panel card empty-lesson"><img src="img/3d/memo.png" alt="" /><p>เรื่องนี้ยังไม่มีข้อสอบ</p>' + addButton(unit.key, lesson.key) + '</div>');
   }
 
   function bankCard(e) {
@@ -1259,8 +1302,11 @@
       return '<datalist id="' + id + '">' + values.map(function (v) { return '<option value="' + esc(v) + '"></option>'; }).join('') + '</datalist>';
     }
     var sameSubject = state.exams.filter(function (x) { return ES.subjectOf(x).name === ES.subjectOf(e).name; });
-    var units = ES.groupBy(sameSubject.filter(function (x) { return x.unit; }), function (x) { return x.unit; }).map(function (g) { return g.key; });
-    var lessons = ES.groupBy(sameSubject.filter(function (x) { return x.lesson && (!e.unit || x.unit === e.unit); }), function (x) { return x.lesson; }).map(function (g) { return g.key; });
+    var off = officialUnits(ES.subjectOf(e).name);
+    var units = mergeGroups(ES.groupBy(sameSubject.filter(function (x) { return x.unit; }), function (x) { return x.unit; }), off.map(function (u) { return u.unit; })).map(function (g) { return g.key; });
+    var offUnit = off.find(function (u) { return u.unit === e.unit; });
+    var lessons = mergeGroups(ES.groupBy(sameSubject.filter(function (x) { return x.lesson && (!e.unit || x.unit === e.unit); }), function (x) { return x.lesson; }),
+      offUnit ? offUnit.lessons : []).map(function (g) { return g.key; });
     var subjectNames = ES.SUBJECTS.map(function (s) { return s.name; });
     var subjectValue = subjectNames.indexOf(e.subject) >= 0 ? e.subject : (ES.subjectOf(e).name);
 
@@ -1648,12 +1694,15 @@
       fileCount: sets.filter(function (e) { return e.source !== 'sheets'; }).length,
       busy: false,
       msg: null,
-      units: ES.groupBy(sets.filter(function (e) { return e.source === 'sheets'; }), ES.unitOf).map(function (g) {
+      units: mergeGroups(ES.groupBy(sets.filter(function (e) { return e.source === 'sheets'; }), ES.unitOf), officialUnits(subjectName).map(function (u) { return u.unit; })).map(function (g) {
+        var off = officialUnits(subjectName).find(function (u) { return u.unit === g.key; });
+        var lessons = mergeGroups(ES.groupBy(g.items, ES.lessonOf), off ? off.lessons : []);
+        // sets without a lesson stay in a "รวมทั้งบท" slot
         return {
           name: g.key === ES.OTHER_UNIT ? '' : g.key,
-          lessons: ES.groupBy(g.items, ES.lessonOf).map(function (l) {
+          lessons: lessons.map(function (l) {
             return { name: l.key, titles: l.items.map(function (e) { return e.title; }) };
-          })
+          }).concat(lessons.some(function (l) { return !l.key; }) ? [] : [{ name: '', titles: [] }])
         };
       })
     };
@@ -2252,6 +2301,17 @@
     else if (a === 'close-student') { state.studentKey = null; render(); }
     else if (a === 'pick-analysis') { state.analysisExamId = t.dataset.exam; render(); }
     else if (a === 'open-bank') { state.statusMsg = null; state.bankExamId = t.dataset.exam; state.edit = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    else if (a === 'add-for') {
+      var areaLetter = (curriculum.areas.find(function (ar) { return ExamSource.subjectOf({ learningArea: ar.name }).name === t.dataset.s; }) || {}).letter;
+      if (areaLetter) state.pick.area = areaLetter;
+      state.pick.grade = 'ป.5';
+      state.pick.subject = t.dataset.s;
+      state.pick.unit = t.dataset.u || '';
+      state.pick.lesson = t.dataset.l || '';
+      state.pick.codes = {};
+      state.pick.touched = true;
+      go('import');
+    }
     else if (a === 'overview-subject') {
       state.view = 'bank'; state.bankExamId = null; state.manage = null;
       state.bankNav = { subject: t.dataset.s, unit: '', lesson: '' };
@@ -2474,6 +2534,9 @@
         var btn = $('promptBtn');
         if (btn) btn.textContent = promptButtonLabel();
       }
+    });
+    loadStructure().then(function () {
+      if (!$('dashShell').hidden) render();
     });
     loadCurriculum().then(function () {
       if (!$('dashShell').hidden) render();

@@ -718,3 +718,11 @@ tr.acc-editing .acc-actions .btn { width: 100%; margin: 0 0 4px; }
 .mg-add { margin-top: 10px; align-self: flex-start; }
 .mg-add-unit { margin-top: 14px; }
 @media (max-width: 600px) { .mg-sets-list, .mg-empty { padding-left: 0; margin-left: 0; } }
+
+/* บท / เรื่องตามหลักสูตรที่ยังไม่มีข้อสอบ */
+.nav-card.is-empty { background: transparent; box-shadow: none; border-style: dashed; }
+.nav-card.is-empty .nav-card-icon { filter: grayscale(.6); opacity: .55; }
+.nav-card.is-empty .nav-card-title { color: var(--ink-soft); }
+.empty-lesson { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 28px 16px; text-align: center; }
+.empty-lesson img { width: 64px; height: 64px; }
+.empty-lesson p { margin: 0; color: var(--ink-soft); }
