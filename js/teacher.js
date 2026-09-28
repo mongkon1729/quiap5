@@ -765,7 +765,8 @@
     var chips = [e.lesson || e.unit, e.difficulty, e.grade].filter(Boolean);
     var where = [e.courseCode, e.indicators && e.indicators.length ? 'ตัวชี้วัด ' + e.indicators.join(', ') : ''].filter(Boolean).join(' • ');
     return '<article class="exam-card" style="animation-delay:' + ((i % 6) * 60) + 'ms">' +
-      '<div class="cover">' + Art.cover(i, theme.img || theme.icon) + '<span class="cover-badge">' + e.questions.length + ' ข้อ</span>' +
+      '<div class="cover">' + Art.cover(i, ExamSource.pictureFor(e, state.exams)) + '<span class="cover-badge">' + e.questions.length + ' ข้อ</span>' +
+        (ExamSource.setNumber(e, state.exams) && e.status !== 'draft' ? '<span class="set-badge">ชุดที่ ' + ExamSource.setNumber(e, state.exams) + '</span>' : '') +
         (e.status === 'draft' ? '<span class="draft-badge">ร่าง • นักเรียนยังไม่เห็น</span>' : '') + '</div>' +
       '<div class="exam-card-body">' +
         '<div class="exam-kind"><img class="kind-icon" src="img/3d/memo.png" alt="" />' + (e.source === 'sheets' ? 'Google Sheets' : 'ไฟล์ในเว็บ') +

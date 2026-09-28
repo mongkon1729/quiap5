@@ -206,11 +206,16 @@
     <section id="screen-summary" class="screen" hidden>
       <div class="summary-card card">
         <div id="confetti" class="confetti" aria-hidden="true"></div>
+        <div class="summary-art-wrap" aria-hidden="true">
+          <img id="summaryArt" class="summary-art" src="" alt="" />
+          <img id="summaryArtSide" class="summary-art-side" src="" alt="" hidden />
+        </div>
         <div id="starsRow" class="stars-row" aria-hidden="true"></div>
         <h1 id="summaryHeading">สรุปผล</h1>
         <p id="summaryScore" class="summary-score"></p>
         <div id="summaryFacts" class="summary-facts"></div>
         <p id="summaryMessage" class="summary-message"></p>
+        <p id="syncStatus" class="sync-status" role="status" hidden></p>
         <div class="summary-actions">
           <button id="btnRetake" type="button" class="btn btn-primary">ทำใหม่</button>
           <button id="btnReviewWrong" type="button" class="btn btn-secondary" hidden>ทบทวนข้อที่ผิด</button>

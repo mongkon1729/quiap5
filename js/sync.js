@@ -3,7 +3,7 @@
 var ResultSync = (function () {
   var OUTBOX_KEY = 'quizapp_outbox_v1';
   var memoryOutbox = [];
-  var flushing = false;
+  var current = null;
 
   function url() {
     return (window.QUIZ_CONFIG && window.QUIZ_CONFIG.sheetsUrl || '').trim();
@@ -40,11 +40,12 @@ var ResultSync = (function () {
     });
   }
 
+  // Resolves when this round of sending is over (sent or not).
   function flush() {
-    if (!url() || flushing) return;
+    if (!url()) return Promise.resolve();
+    if (current) return current.then(flush);
     var items = readOutbox();
-    if (!items.length) return;
-    flushing = true;
+    if (!items.length) return Promise.resolve();
     var remaining = items.slice();
     var chain = Promise.resolve();
     items.forEach(function (item) {
@@ -55,16 +56,23 @@ var ResultSync = (function () {
         });
       });
     });
-    chain.catch(function () {}).then(function () { flushing = false; });
+    current = chain.catch(function () {}).then(function () { current = null; });
+    return current;
   }
 
+  function isQueued(clientId) {
+    return readOutbox().some(function (r) { return r.clientId === clientId; });
+  }
+
+  // Resolves true when the teacher's sheet got it, false when it waits in the outbox.
   function submit(result) {
-    if (!url()) return;
+    if (!url()) return null;
     result.clientId = newId();
     var items = readOutbox();
     items.push(result);
     writeOutbox(items.slice(-200));
-    flush();
+    if (navigator.onLine === false) return Promise.resolve(false);
+    return flush().then(function () { return !isQueued(result.clientId); });
   }
 
   window.addEventListener('online', flush);

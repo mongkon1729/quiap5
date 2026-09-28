@@ -305,6 +305,37 @@ var ExamSource = (function () {
   ];
   var OTHER_UNIT = 'เรื่องอื่นๆ';
 
+  // Several 3D pictures per subject so neighbouring sets don't look the same.
+  var POOLS = {
+    'คณิตศาสตร์': ['abacus', 'input_numbers', 'triangular_ruler', 'bar_chart', 'straight_ruler', 'puzzle_piece', 'chart_increasing'],
+    'วิทยาศาสตร์': ['microscope', 'test_tube', 'dna', 'magnet', 'telescope', 'seedling', 'light_bulb'],
+    'ภาษาไทย': ['open_book', 'notebook', 'pencil', 'scroll', 'memo', 'speech_balloon', 'bookmark_tabs'],
+    'สังคมศึกษา': ['globe', 'world_map', 'classical_building', 'money_bag', 'coin', 'school', 'calendar'],
+    'ภาษาอังกฤษ': ['input_latin_letters', 'speech_balloon', 'notebook_with_decorative_cover', 'megaphone', 'books', 'crayon'],
+    'สุขศึกษาและพลศึกษา': ['soccer_ball', 'basketball', 'running_shoe', 'red_heart', 'sports_medal', 'stopwatch'],
+    'ศิลปะ': ['artist_palette', 'musical_note', 'guitar', 'crayon', 'rainbow', 'sparkles'],
+    'การงานอาชีพ': ['hammer_and_wrench', 'potted_plant', 'deciduous_tree', 'laptop', 'light_bulb', 'paperclip']
+  };
+  var OTHER_POOL = ['books', 'green_book', 'blue_book', 'orange_book', 'ledger', 'closed_book'];
+
+  function sameSubject(a, b) {
+    return subjectOf(a).name === subjectOf(b).name;
+  }
+
+  function pictureFor(exam, all) {
+    var pool = POOLS[subjectOf(exam).name] || OTHER_POOL;
+    var i = Math.max(0, all.filter(function (e) { return sameSubject(e, exam); }).indexOf(exam));
+    return 'img/3d/' + pool[i % pool.length] + '.png';
+  }
+
+  // "ชุดที่ 2" when a lesson (or unit) has more than one set; 0 when it is the only one.
+  function setNumber(exam, all) {
+    var group = all.filter(function (e) {
+      return sameSubject(e, exam) && unitOf(e) === unitOf(exam) && lessonOf(e) === lessonOf(exam);
+    });
+    return group.length > 1 ? group.indexOf(exam) + 1 : 0;
+  }
+
   function subjectOf(exam) {
     var texts = [exam.subject, exam.learningArea].filter(Boolean).map(function (t) { return String(t).trim(); });
     for (var i = 0; i < SUBJECTS.length; i++) {
@@ -378,6 +409,8 @@ var ExamSource = (function () {
     groupBy: groupBy,
     navCardHtml: navCardHtml,
     pic: pic,
+    pictureFor: pictureFor,
+    setNumber: setNumber,
     isEnabled: function () { return !!sheetsUrl(); }
   };
 })();

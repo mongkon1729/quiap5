@@ -51,6 +51,9 @@
     el.browseTitle = document.getElementById('browseTitle');
     el.browseCrumbs = document.getElementById('browseCrumbs');
     el.searchInput = document.getElementById('searchInput');
+    el.summaryArt = document.getElementById('summaryArt');
+    el.summaryArtSide = document.getElementById('summaryArtSide');
+    el.syncStatus = document.getElementById('syncStatus');
     el.sideNav = document.getElementById('sideNav');
     el.btnSideReview = document.getElementById('btnSideReview');
     el.sidePromoText = document.getElementById('sidePromoText');
@@ -325,14 +328,15 @@
   function examCard(exam, i) {
     var best = state.currentUserName ? Storage.getBestScore(state.currentUserName, exam.id) : null;
     var pct = best ? Math.round((best.score / best.total) * 100) : 0;
-    var theme = subjectOf(exam);
+    var setNo = ExamSource.setNumber(exam, examsData.exams);
     var chips = [exam.lesson || (exam.unit ? exam.unit : ''), exam.difficulty, exam.grade].filter(Boolean);
     var card = document.createElement('article');
     card.className = 'exam-card';
     card.style.animationDelay = ((i % 8) * 60) + 'ms';
     card.innerHTML =
-      '<div class="cover">' + Art.cover(i, theme.img || theme.icon) +
+      '<div class="cover">' + Art.cover(i, ExamSource.pictureFor(exam, examsData.exams)) +
         '<span class="cover-badge">' + exam.questions.length + ' ข้อ</span>' +
+        (setNo ? '<span class="set-badge">ชุดที่ ' + setNo + '</span>' : '') +
       '</div>' +
       '<div class="exam-card-body">' +
         '<div class="exam-kind"><img class="kind-icon" src="img/3d/memo.png" alt="" />แบบทดสอบ' +
@@ -732,8 +736,9 @@
     }
     if (state.currentUserName) Account.pushProgress();
 
+    var sending = null;
     if (attempted > 0 && state.currentUserName) {
-      ResultSync.submit({
+      sending = ResultSync.submit({
         timestamp: new Date().toISOString(),
         student: state.displayName || state.currentUserName,
         examId: state.selectedExam.id,
@@ -748,7 +753,22 @@
     }
 
     renderSummary(score, attempted);
+    showSyncStatus(sending);
     showScreen(el.screenSummary);
+  }
+
+  function showSyncStatus(sending) {
+    var box = el.syncStatus;
+    if (!sending) { box.hidden = true; return; }
+    box.hidden = false;
+    box.className = 'sync-status is-sending';
+    box.textContent = 'กำลังส่งคะแนนให้คุณครู...';
+    sending.then(function (sent) {
+      box.className = 'sync-status ' + (sent ? 'is-sent' : 'is-queued');
+      box.textContent = sent
+        ? '✓ ส่งคะแนนให้คุณครูแล้ว'
+        : 'ยังส่งคะแนนไม่ได้ (ไม่มีอินเทอร์เน็ต) ไม่ต้องห่วง เว็บจะส่งให้เองเมื่อต่อเน็ตได้';
+    });
   }
 
   function renderSummary(score, total) {
@@ -760,8 +780,17 @@
     } else if (pct >= 50) {
       message = 'ทำได้ดีนะ ทบทวนข้อที่ผิดอีกนิด คราวหน้าได้เพิ่มแน่';
     } else {
-      message = 'ไม่เป็นไรนะ ลองทบทวนข้อที่ผิด แล้วกลับมาทำใหม่กัน';
+      message = 'ไม่เป็นไรนะ ต้นกล้าก็ค่อยๆ โต ลองทบทวนข้อที่ผิด แล้วกลับมาทำใหม่กัน';
     }
+
+    // a picture for every result, so every child leaves with something nice
+    var art = stars === 3 ? ['trophy', 'party_popper'] : (stars === 2 ? ['sports_medal', 'glowing_star'] : ['seedling', 'sun']);
+    el.summaryArt.src = 'img/3d/' + art[0] + '.png';
+    el.summaryArtSide.src = 'img/3d/' + art[1] + '.png';
+    el.summaryArtSide.hidden = false;
+    el.summaryArt.classList.remove('pop-in');
+    void el.summaryArt.offsetWidth;
+    el.summaryArt.classList.add('pop-in');
 
     el.summaryHeading.textContent = state.selectedExam.title;
     el.starsRow.innerHTML = [0, 1, 2].map(function (i) {
