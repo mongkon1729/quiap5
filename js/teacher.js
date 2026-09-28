@@ -447,10 +447,10 @@
   }
 
   function teacherBanner() {
-    return '<div class="hero hero-banner"><div class="hero-illus hero-illus-left">' + Art.hero() + '</div>' +
+    return '<div class="hero hero-banner"><div class="hero-illus hero-illus-left">' + Art.scene('books', 'bar_chart', 'pencil') + '</div>' +
       '<div class="hero-text"><h1>สวัสดีคุณครู</h1><p>ดูผลของนักเรียน วิเคราะห์ข้อสอบ และเพิ่มชุดใหม่ได้จากที่นี่</p>' +
       '<button type="button" class="btn btn-hero" data-action="nav" data-view="import">เพิ่มข้อสอบชุดใหม่</button></div>' +
-      '<div class="hero-illus hero-illus-right">' + Art.shelf() + '</div></div>';
+      '<div class="hero-illus hero-illus-right">' + Art.scene('school', 'graduation_cap', 'sparkles') + '</div></div>';
   }
 
   function stat(color, label, value, foot) {
@@ -762,9 +762,9 @@
     var chips = [e.lesson || e.unit, e.difficulty, e.grade].filter(Boolean);
     var where = [e.courseCode, e.indicators && e.indicators.length ? 'ตัวชี้วัด ' + e.indicators.join(', ') : ''].filter(Boolean).join(' • ');
     return '<article class="exam-card" style="animation-delay:' + ((i % 6) * 60) + 'ms">' +
-      '<div class="cover">' + Art.cover(i, theme.icon) + '<span class="cover-badge">' + e.questions.length + ' ข้อ</span></div>' +
+      '<div class="cover">' + Art.cover(i, theme.img || theme.icon) + '<span class="cover-badge">' + e.questions.length + ' ข้อ</span></div>' +
       '<div class="exam-card-body">' +
-        '<div class="exam-kind"><span class="kind-icon" aria-hidden="true">📝</span>' + (e.source === 'sheets' ? 'Google Sheets' : 'ไฟล์ในเว็บ') +
+        '<div class="exam-kind"><img class="kind-icon" src="img/3d/memo.png" alt="" />' + (e.source === 'sheets' ? 'Google Sheets' : 'ไฟล์ในเว็บ') +
           (e.examType ? '<span class="kind-dot">•</span><span class="kind-type">' + esc(e.examType) + '</span>' : '') + '</div>' +
         '<h3>' + esc(e.title) + '</h3>' +
         (chips.length ? '<div class="exam-chips">' + chips.map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') + '</div>' : '') +
@@ -1788,7 +1788,7 @@
   function showLock() {
     $('dashShell').hidden = true;
     $('lockScreen').hidden = false;
-    $('lockArt').innerHTML = Art.hero();
+    $('lockArt').innerHTML = '<img src="img/3d/school.png" alt="" style="width:100%;height:100%;object-fit:contain" />';
     $('lockKey').value = '';
     $('lockKey').focus();
   }

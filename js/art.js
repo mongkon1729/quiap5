@@ -27,7 +27,8 @@ var Art = (function () {
       '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + t[0] + '"/><stop offset="1" stop-color="' + t[1] + '"/></linearGradient></defs>' +
       '<rect width="320" height="130" fill="url(#' + id + ')"/>' + blobs +
       '<ellipse cx="200" cy="112" rx="46" ry="7" fill="#3b2f8a" opacity=".12"/>' +
-      '<text x="200" y="98" font-size="64" text-anchor="middle">' + (icon || '📝') + '</text>' +
+      (/\.png$/.test(icon || '') ? '<image href="' + icon + '" x="150" y="12" width="100" height="100"/>'
+        : '<text x="200" y="98" font-size="64" text-anchor="middle">' + (icon || '📝') + '</text>') +
       '<circle cx="104" cy="44" r="5" fill="#fff" opacity=".9"/><circle cx="128" cy="92" r="3.5" fill="#fff" opacity=".8"/>' +
       '</svg>';
   }
@@ -63,5 +64,14 @@ var Art = (function () {
       '</svg>';
   }
 
-  return { cover: cover, hero: hero, shelf: shelf, color: color };
+  // 3D picture groups for banners: one big object with small ones floating around it
+  function scene(big, small1, small2) {
+    var p = 'img/3d/';
+    return '<div class="scene3d" aria-hidden="true">' +
+      '<img class="s-big" src="' + p + big + '.png" alt="" />' +
+      '<img class="s-a" src="' + p + small1 + '.png" alt="" />' +
+      '<img class="s-b" src="' + p + small2 + '.png" alt="" /></div>';
+  }
+
+  return { cover: cover, hero: hero, shelf: shelf, scene: scene, color: color };
 })();

@@ -291,14 +291,14 @@ var ExamSource = (function () {
   // ---------- วิชา → บท → เรื่อง (ใช้ทั้งหน้านักเรียนและหน้าครู) ----------
 
   var SUBJECTS = [
-    { name: 'คณิตศาสตร์', match: /คณิต|^ค$/, icon: '🧮', c1: '#dfe4ff', c2: '#b4c0fb', ink: '#2d3a9c' },
-    { name: 'วิทยาศาสตร์', match: /วิทย|^ว$/, icon: '🔬', c1: '#d9f3e4', c2: '#a6dcbd', ink: '#1d6a44' },
-    { name: 'ภาษาไทย', match: /ภาษาไทย|^ท$/, icon: '📖', c1: '#ffe3e9', c2: '#f5b3c2', ink: '#8e2f4a' },
-    { name: 'สังคมศึกษา', match: /สังคม|^ส$/, icon: '🌏', c1: '#fff3cc', c2: '#f7d56e', ink: '#6b4800' },
-    { name: 'ภาษาอังกฤษ', match: /อังกฤษ|ต่างประเทศ|english|^ต$|^อ$/i, icon: '🔤', c1: '#ece4fc', c2: '#cdbcf2', ink: '#5a3a9e' },
-    { name: 'สุขศึกษาและพลศึกษา', match: /สุขศึกษา|พลศึกษา|^พ$/, icon: '⚽', c1: '#ffe8d9', c2: '#f8c39c', ink: '#8a4516' },
-    { name: 'ศิลปะ', match: /ศิลป|ดนตรี|นาฏ|^ศ$/, icon: '🎨', c1: '#ffe3f3', c2: '#f0b3da', ink: '#86306a' },
-    { name: 'การงานอาชีพ', match: /การงาน|^ง$/, icon: '🛠️', c1: '#e3f0f8', c2: '#b3d4ea', ink: '#1f5579' }
+    { name: 'คณิตศาสตร์', match: /คณิต|^ค$/, icon: '🧮', img: 'img/3d/abacus.png', c1: '#dfe4ff', c2: '#b4c0fb', ink: '#2d3a9c' },
+    { name: 'วิทยาศาสตร์', match: /วิทย|^ว$/, icon: '🔬', img: 'img/3d/microscope.png', c1: '#d9f3e4', c2: '#a6dcbd', ink: '#1d6a44' },
+    { name: 'ภาษาไทย', match: /ภาษาไทย|^ท$/, icon: '📖', img: 'img/3d/open_book.png', c1: '#ffe3e9', c2: '#f5b3c2', ink: '#8e2f4a' },
+    { name: 'สังคมศึกษา', match: /สังคม|^ส$/, icon: '🌏', img: 'img/3d/globe.png', c1: '#fff3cc', c2: '#f7d56e', ink: '#6b4800' },
+    { name: 'ภาษาอังกฤษ', match: /อังกฤษ|ต่างประเทศ|english|^ต$|^อ$/i, icon: '🔤', img: 'img/3d/input_latin_letters.png', c1: '#ece4fc', c2: '#cdbcf2', ink: '#5a3a9e' },
+    { name: 'สุขศึกษาและพลศึกษา', match: /สุขศึกษา|พลศึกษา|^พ$/, icon: '⚽', img: 'img/3d/soccer_ball.png', c1: '#ffe8d9', c2: '#f8c39c', ink: '#8a4516' },
+    { name: 'ศิลปะ', match: /ศิลป|ดนตรี|นาฏ|^ศ$/, icon: '🎨', img: 'img/3d/artist_palette.png', c1: '#ffe3f3', c2: '#f0b3da', ink: '#86306a' },
+    { name: 'การงานอาชีพ', match: /การงาน|^ง$/, icon: '🛠️', img: 'img/3d/hammer_and_wrench.png', c1: '#e3f0f8', c2: '#b3d4ea', ink: '#1f5579' }
   ];
   var OTHER_UNIT = 'เรื่องอื่นๆ';
 
@@ -307,7 +307,7 @@ var ExamSource = (function () {
     for (var i = 0; i < SUBJECTS.length; i++) {
       if (texts.some(function (t) { return SUBJECTS[i].match.test(t); })) return SUBJECTS[i];
     }
-    return { name: texts[0] || 'วิชาอื่นๆ', icon: '📚', c1: '#f1ede6', c2: '#dcd5ca', ink: '#4a4552' };
+    return { name: texts[0] || 'วิชาอื่นๆ', icon: '📚', img: 'img/3d/books.png', c1: '#f1ede6', c2: '#dcd5ca', ink: '#4a4552' };
   }
 
   // บทใหญ่ = หน่วยการเรียนรู้ ถ้าไม่ได้ใส่ ใช้สาระตามหลักสูตรแกนกลางแทน
@@ -338,6 +338,11 @@ var ExamSource = (function () {
     });
   }
 
+  // 3D picture when we have one, emoji otherwise
+  function pic(src, fallback) {
+    return src ? '<img class="pic3d" src="' + escHtml(src) + '" alt="" loading="lazy" decoding="async" />' : (fallback || '');
+  }
+
   // opts: { href | attrs, theme, icon, kicker, title, sub, pct (0-100 or null), big, delay }
   function navCardHtml(opts) {
     var t = opts.theme;
@@ -350,7 +355,7 @@ var ExamSource = (function () {
         '<span class="nav-card-title">' + escHtml(opts.title) + '</span>' +
         '<span class="nav-card-sub">' + escHtml(opts.sub) + '</span>' +
       '</span>' +
-      '<span class="nav-card-icon" aria-hidden="true">' + (opts.icon || t.icon) + '</span>' +
+      '<span class="nav-card-icon" aria-hidden="true">' + pic(opts.img || t.img, opts.icon || t.icon) + '</span>' +
       (opts.pct != null ? '<span class="nav-card-meter" aria-hidden="true"><span style="width:' + Math.max(0, Math.min(100, opts.pct)) + '%"></span></span>' : '') +
       '</' + tag + '>';
   }
@@ -369,6 +374,7 @@ var ExamSource = (function () {
     lessonOf: lessonOf,
     groupBy: groupBy,
     navCardHtml: navCardHtml,
+    pic: pic,
     isEnabled: function () { return !!sheetsUrl(); }
   };
 })();

@@ -324,11 +324,11 @@
     card.className = 'exam-card';
     card.style.animationDelay = ((i % 8) * 60) + 'ms';
     card.innerHTML =
-      '<div class="cover">' + Art.cover(i, theme.icon) +
+      '<div class="cover">' + Art.cover(i, theme.img || theme.icon) +
         '<span class="cover-badge">' + exam.questions.length + ' ข้อ</span>' +
       '</div>' +
       '<div class="exam-card-body">' +
-        '<div class="exam-kind"><span class="kind-icon" aria-hidden="true">📝</span>แบบทดสอบ' +
+        '<div class="exam-kind"><img class="kind-icon" src="img/3d/memo.png" alt="" />แบบทดสอบ' +
           (exam.examType ? '<span class="kind-dot">•</span><span class="kind-type">' + escapeHtml(exam.examType) + '</span>' : '') + '</div>' +
         '<h3>' + escapeHtml(exam.title) + '</h3>' +
         (chips.length ? '<div class="exam-chips">' + chips.map(function (c) { return '<span>' + escapeHtml(c) + '</span>'; }).join('') + '</div>' : '') +
@@ -360,7 +360,7 @@
     };
     el.sideNav.innerHTML = item('#/', HOME_ICON, 'หน้าแรก', !nav.subject) +
       subjects.map(function (g) {
-        return item(navHash(g.key), '<span class="side-emoji">' + subjectOf(g.items[0]).icon + '</span>', g.key, nav.subject === g.key);
+        return item(navHash(g.key), ExamSource.pic(subjectOf(g.items[0]).img, subjectOf(g.items[0]).icon), g.key, nav.subject === g.key);
       }).join('') +
       '<button type="button" class="side-link" id="sideReviewLink"><span class="side-link-icon">' + REVIEW_ICON + '</span><span>ทบทวนข้อที่ผิด</span></button>' +
       item('teacher.html', TEACHER_ICON, 'สำหรับคุณครู', false);
@@ -393,7 +393,7 @@
       var t = subjectOf(g.items[0]);
       var n = user ? g.items.filter(function (e) { return Storage.getBestScore(user, e.id); }).length : 0;
       var pct = Math.round(n / g.items.length * 100);
-      return '<a class="achieve-row" href="' + navHash(g.key) + '"><span class="achieve-icon" style="background:' + t.c1 + '">' + t.icon + '</span>' +
+      return '<a class="achieve-row" href="' + navHash(g.key) + '"><span class="achieve-icon" style="background:' + t.c1 + '">' + ExamSource.pic(t.img, t.icon) + '</span>' +
         '<span class="achieve-body"><span class="achieve-top"><b>' + escapeHtml(g.key) + '</b><span>' + (pct === 100 ? '⭐ ' : '') + n + '/' + g.items.length + ' ชุด</span></span>' +
         '<span class="bar"><span style="width:' + pct + '%"></span></span></span></a>';
     }).join('');
@@ -406,7 +406,7 @@
       var t = subjectOf(e);
       var row = document.createElement('div');
       row.className = 'suggest-row';
-      row.innerHTML = '<span class="suggest-thumb" style="background:' + t.c1 + '">' + t.icon + '</span>' +
+      row.innerHTML = '<span class="suggest-thumb" style="background:' + t.c1 + '">' + ExamSource.pic(t.img, t.icon) + '</span>' +
         '<span class="suggest-body"><b>' + escapeHtml(e.title) + '</b><span>⭐ ' + e.questions.length + ' ข้อ • ' + escapeHtml(t.name) + '</span></span>' +
         '<button type="button" class="btn btn-primary suggest-btn">ทำ</button>';
       row.querySelector('button').addEventListener('click', function () { openIdentifyScreen(e); });
@@ -932,8 +932,8 @@
     if (!Storage.isAvailable()) {
       el.storageWarning.hidden = false;
     }
-    el.heroArt.innerHTML = Art.hero();
-    el.heroShelf.innerHTML = Art.shelf();
+    el.heroArt.innerHTML = Art.scene('books', 'graduation_cap', 'pencil');
+    el.heroShelf.innerHTML = Art.scene('trophy', 'glowing_star', 'light_bulb');
     renderThemeButton();
     ResultSync.flush();
 
