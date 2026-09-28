@@ -47,6 +47,10 @@
     el.heroSub = document.getElementById('heroSub');
     el.heroArt = document.getElementById('heroArt');
     el.examCount = document.getElementById('examCount');
+    el.browseTitle = document.getElementById('browseTitle');
+    el.browseCrumbs = document.getElementById('browseCrumbs');
+    el.howTo = document.getElementById('howTo');
+    el.heroCard = el.heroTitle.closest('.hero');
     el.examList = document.getElementById('examList');
     el.reviewEntry = document.getElementById('reviewEntry');
     el.btnGlobalReview = document.getElementById('btnGlobalReview');
@@ -152,37 +156,216 @@
     return tags.length ? '<div class="exam-tags">' + tags.join('') + '</div>' : '';
   }
 
+  // ---------- เลือกวิชา → บท → เรื่อง → ชุดข้อสอบ ----------
+
+  var SUBJECTS = [
+    { name: 'คณิตศาสตร์', match: /คณิต|^ค$/, icon: '🧮', c1: '#c9d3ff', c2: '#a9b6fb', ink: '#2d3a9c' },
+    { name: 'วิทยาศาสตร์', match: /วิทย|^ว$/, icon: '🔬', c1: '#c8efd9', c2: '#9ed8b6', ink: '#1d6a44' },
+    { name: 'ภาษาไทย', match: /ภาษาไทย|^ท$/, icon: '📖', c1: '#ffd9e1', c2: '#f5a6b8', ink: '#8e2f4a' },
+    { name: 'สังคมศึกษา', match: /สังคม|^ส$/, icon: '🌏', c1: '#fff0bf', c2: '#f7c948', ink: '#6b4800' },
+    { name: 'ภาษาอังกฤษ', match: /อังกฤษ|ต่างประเทศ|english|^ต$|^อ$/i, icon: '🔤', c1: '#e3d8fb', c2: '#c7b3f0', ink: '#5a3a9e' },
+    { name: 'สุขศึกษาและพลศึกษา', match: /สุขศึกษา|พลศึกษา|^พ$/, icon: '⚽', c1: '#ffe0cc', c2: '#f8bb8c', ink: '#8a4516' },
+    { name: 'ศิลปะ', match: /ศิลป|ดนตรี|นาฏ|^ศ$/, icon: '🎨', c1: '#ffd9f0', c2: '#efa6d4', ink: '#86306a' },
+    { name: 'การงานอาชีพ', match: /การงาน|^ง$/, icon: '🛠️', c1: '#dcebf5', c2: '#a8cde6', ink: '#1f5579' }
+  ];
+  var OTHER_THEME = { icon: '📚', c1: '#ece7df', c2: '#d6cfc3', ink: '#4a4552' };
+  var OTHER_UNIT = 'เรื่องอื่นๆ';
+
+  function subjectOf(exam) {
+    var texts = [exam.subject, exam.learningArea].filter(Boolean).map(function (t) { return String(t).trim(); });
+    for (var i = 0; i < SUBJECTS.length; i++) {
+      if (texts.some(function (t) { return SUBJECTS[i].match.test(t); })) return SUBJECTS[i];
+    }
+    return { name: texts[0] || 'วิชาอื่นๆ', icon: OTHER_THEME.icon, c1: OTHER_THEME.c1, c2: OTHER_THEME.c2, ink: OTHER_THEME.ink };
+  }
+
+  // บทใหญ่ = หน่วยการเรียนรู้ ถ้าไม่ได้ใส่ ใช้สาระตามหลักสูตรแกนกลางแทน
+  function unitOf(exam) {
+    var u = String(exam.unit || '').trim() || String(exam.strand || '').split(',')[0].trim();
+    return u || OTHER_UNIT;
+  }
+
+  function lessonOf(exam) {
+    return String(exam.lesson || '').trim();
+  }
+
+  // Groups keep the order exams appear in the data, so the teacher controls the order.
+  function groupBy(list, keyFn) {
+    var order = [];
+    var map = {};
+    list.forEach(function (item) {
+      var k = keyFn(item);
+      if (!map[k]) { map[k] = []; order.push(k); }
+      map[k].push(item);
+    });
+    return order.map(function (k) { return { key: k, items: map[k] }; });
+  }
+
+  function readNav() {
+    var parts = (window.location.hash.replace(/^#\/?/, '') || '').split('/').map(function (p) {
+      try { return decodeURIComponent(p); } catch (e) { return ''; }
+    });
+    return { subject: parts[0] || '', unit: parts[1] || '', lesson: parts[2] || '' };
+  }
+
+  function navHash() {
+    return '#/' + Array.prototype.slice.call(arguments).filter(Boolean).map(encodeURIComponent).join('/');
+  }
+
+  function progressText(exams) {
+    if (!state.currentUserName) return exams.length + ' ชุด';
+    var done = exams.filter(function (e) { return Storage.getBestScore(state.currentUserName, e.id); }).length;
+    return 'ทำแล้ว ' + done + ' / ' + exams.length + ' ชุด';
+  }
+
+  function navCard(opts, i) {
+    var a = document.createElement('a');
+    a.className = 'nav-card' + (opts.big ? ' nav-card-big' : '');
+    a.href = opts.href;
+    a.style.animationDelay = (i * 60) + 'ms';
+    a.style.setProperty('--c1', opts.theme.c1);
+    a.style.setProperty('--c2', opts.theme.c2);
+    a.style.setProperty('--c-ink', opts.theme.ink);
+    a.innerHTML =
+      '<span class="nav-card-text">' +
+        (opts.kicker ? '<span class="nav-card-kicker">' + escapeHtml(opts.kicker) + '</span>' : '') +
+        '<span class="nav-card-title">' + escapeHtml(opts.title) + '</span>' +
+        '<span class="nav-card-sub">' + escapeHtml(opts.sub) + '</span>' +
+      '</span>' +
+      '<span class="nav-card-icon" aria-hidden="true">' + opts.icon + '</span>';
+    return a;
+  }
+
+  function renderCrumbs(items) {
+    if (!items.length) { el.browseCrumbs.hidden = true; el.browseCrumbs.innerHTML = ''; return; }
+    el.browseCrumbs.hidden = false;
+    var back = items.length > 1 ? items[items.length - 2].href : '#/';
+    el.browseCrumbs.innerHTML = '<a class="btn btn-sm crumb-back" href="' + back + '">‹ ย้อนกลับ</a>' +
+      '<ol><li><a href="#/">ทุกวิชา</a></li>' + items.map(function (it, i) {
+        return i === items.length - 1
+          ? '<li aria-current="page">' + escapeHtml(it.label) + '</li>'
+          : '<li><a href="' + it.href + '">' + escapeHtml(it.label) + '</a></li>';
+      }).join('') + '</ol>';
+  }
+
+  function renderBrowse() {
+    var nav = readNav();
+    var all = examsData.exams;
+    var bySubject = groupBy(all, function (e) { return subjectOf(e).name; });
+    var subject = bySubject.find(function (g) { return g.key === nav.subject; });
+    var theme = subject ? subjectOf(subject.items[0]) : null;
+    var units = subject ? groupBy(subject.items, unitOf) : [];
+    var unit = units.find(function (g) { return g.key === nav.unit; });
+    var lessons = unit ? groupBy(unit.items.filter(lessonOf), lessonOf) : [];
+    var lesson = lessons.find(function (g) { return g.key === nav.lesson; });
+
+    el.examList.innerHTML = '';
+    el.howTo.hidden = !!subject;
+    el.heroCard.hidden = !!subject;
+
+    if (!subject) {
+      renderCrumbs([]);
+      el.browseTitle.textContent = 'เลือกวิชา';
+      el.examCount.textContent = bySubject.length + ' วิชา • ' + all.length + ' ชุด';
+      el.examList.className = 'nav-grid';
+      bySubject.forEach(function (g, i) {
+        var t = subjectOf(g.items[0]);
+        el.examList.appendChild(navCard({ href: navHash(g.key), title: g.key, sub: progressText(g.items), icon: t.icon, theme: t, big: true }, i));
+      });
+      return;
+    }
+
+    var crumbs = [{ label: subject.key, href: navHash(subject.key) }];
+    if (!unit) {
+      renderCrumbs(crumbs);
+      el.browseTitle.textContent = subject.key;
+      el.examCount.textContent = units.length + ' บท';
+      el.examList.className = 'nav-list';
+      units.forEach(function (g, i) {
+        var nLessons = groupBy(g.items.filter(lessonOf), lessonOf).length;
+        el.examList.appendChild(navCard({
+          href: navHash(subject.key, g.key),
+          kicker: String(g.items[0].unit || '').trim() ? 'บทที่ ' + (i + 1) : '',
+          title: g.key,
+          sub: (nLessons ? nLessons + ' เรื่อง • ' : '') + progressText(g.items),
+          icon: theme.icon, theme: theme
+        }, i));
+      });
+      return;
+    }
+
+    crumbs.push({ label: unit.key, href: navHash(subject.key, unit.key) });
+    if (!lesson) {
+      renderCrumbs(crumbs);
+      el.browseTitle.textContent = unit.key;
+      var loose = unit.items.filter(function (e) { return !lessonOf(e); });
+      el.examCount.textContent = [lessons.length ? lessons.length + ' เรื่อง' : '', loose.length ? loose.length + ' ชุดรวมทั้งบท' : '']
+        .filter(Boolean).join(' • ');
+      el.examList.className = 'nav-list';
+      lessons.forEach(function (g, i) {
+        el.examList.appendChild(navCard({
+          href: navHash(subject.key, unit.key, g.key),
+          kicker: 'เรื่องที่ ' + (i + 1), title: g.key, sub: progressText(g.items), icon: theme.icon, theme: theme
+        }, i));
+      });
+      if (loose.length) appendExamCards(loose, lessons.length ? 'ชุดข้อสอบรวมทั้งบท' : '');
+      return;
+    }
+
+    crumbs.push({ label: lesson.key, href: navHash(subject.key, unit.key, lesson.key) });
+    renderCrumbs(crumbs);
+    el.browseTitle.textContent = lesson.key;
+    el.examCount.textContent = lesson.items.length + ' ชุด';
+    el.examList.className = 'nav-list';
+    appendExamCards(lesson.items, '');
+  }
+
+  function appendExamCards(exams, heading) {
+    if (heading) {
+      var h = document.createElement('h3');
+      h.className = 'nav-subhead';
+      h.textContent = heading;
+      el.examList.appendChild(h);
+    }
+    var grid = document.createElement('div');
+    grid.className = 'exam-grid';
+    exams.forEach(function (exam) {
+      grid.appendChild(examCard(exam, examsData.exams.indexOf(exam)));
+    });
+    el.examList.appendChild(grid);
+  }
+
+  function examCard(exam, i) {
+    var best = state.currentUserName ? Storage.getBestScore(state.currentUserName, exam.id) : null;
+    var pct = best ? Math.round((best.score / best.total) * 100) : 0;
+    var card = document.createElement('article');
+    card.className = 'exam-card card';
+    card.style.animationDelay = (i * 70) + 'ms';
+    card.innerHTML =
+      '<div class="cover">' + Art.cover(i) +
+        '<span class="pill">' + exam.questions.length + ' ข้อ</span>' +
+      '</div>' +
+      '<div class="exam-card-body">' +
+        examTags(exam) +
+        '<h3>' + escapeHtml(exam.title) + '</h3>' +
+        (exam.lesson || exam.unit ? '<p class="exam-lesson">' + escapeHtml(exam.lesson ? 'เรื่อง ' + exam.lesson : exam.unit) + '</p>' : '') +
+        '<div class="exam-meta"><span>' + escapeHtml([exam.subject, exam.grade].filter(Boolean).join(' • ')) + '</span>' +
+        '<span>จับเวลา ' + (exam.timeLimitMinutes || 15) + ' นาที</span></div>' +
+        (best
+          ? '<div class="best-row"><span>คะแนนสูงสุด</span><strong>' + best.score + '/' + best.total + '</strong></div>' +
+            '<div class="bar"><span style="width:' + pct + '%"></span></div>'
+          : '<div class="best-row"><span>' + (state.currentUserName ? 'ยังไม่เคยทำชุดนี้' : 'เข้าชื่อแล้วจะเห็นคะแนนสูงสุด') + '</span></div>') +
+        '<button type="button" class="btn btn-primary btn-start-exam">เริ่มทำข้อสอบ</button>' +
+      '</div>';
+    card.querySelector('.btn-start-exam').addEventListener('click', function () {
+      openIdentifyScreen(exam);
+    });
+    return card;
+  }
+
   function renderStartScreen() {
     renderUserChip();
-    el.examCount.textContent = examsData.exams.length + ' ชุด';
-    el.examList.innerHTML = '';
-    examsData.exams.forEach(function (exam, i) {
-      var best = state.currentUserName ? Storage.getBestScore(state.currentUserName, exam.id) : null;
-      var pct = best ? Math.round((best.score / best.total) * 100) : 0;
-      var card = document.createElement('article');
-      card.className = 'exam-card card';
-      card.style.animationDelay = (i * 70) + 'ms';
-      card.innerHTML =
-        '<div class="cover">' + Art.cover(i) +
-          '<span class="pill">' + exam.questions.length + ' ข้อ</span>' +
-        '</div>' +
-        '<div class="exam-card-body">' +
-          examTags(exam) +
-          '<h3>' + escapeHtml(exam.title) + '</h3>' +
-          (exam.lesson || exam.unit ? '<p class="exam-lesson">' + escapeHtml(exam.lesson ? 'เรื่อง ' + exam.lesson : exam.unit) + '</p>' : '') +
-          '<div class="exam-meta"><span>' + escapeHtml([exam.subject, exam.grade].filter(Boolean).join(' • ')) + '</span>' +
-          '<span>จับเวลา ' + (exam.timeLimitMinutes || 15) + ' นาที</span></div>' +
-          (best
-            ? '<div class="best-row"><span>คะแนนสูงสุด</span><strong>' + best.score + '/' + best.total + '</strong></div>' +
-              '<div class="bar"><span style="width:' + pct + '%"></span></div>'
-            : '<div class="best-row"><span>' + (state.currentUserName ? 'ยังไม่เคยทำชุดนี้' : 'เข้าชื่อแล้วจะเห็นคะแนนสูงสุด') + '</span></div>') +
-          '<button type="button" class="btn btn-primary btn-start-exam">เริ่มทำข้อสอบ</button>' +
-        '</div>';
-      card.querySelector('.btn-start-exam').addEventListener('click', function () {
-        openIdentifyScreen(exam);
-      });
-      el.examList.appendChild(card);
-    });
+    renderBrowse();
 
     var wrongCount = state.currentUserName ? Storage.getWrongQuestions(state.currentUserName).length : 0;
     if (wrongCount > 0) {
@@ -694,6 +877,12 @@
     el.heroArt.innerHTML = Art.hero();
     renderThemeButton();
     ResultSync.flush();
+
+    window.addEventListener('hashchange', function () {
+      if (el.screenStart.hidden) return;
+      renderStartScreen();
+      window.scrollTo(0, 0);
+    });
 
     ExamSource.load(function (data) {
       examsData = { exams: data.exams };
